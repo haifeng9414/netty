@@ -1,0 +1,15 @@
+== EventLoop接口
+EventLoop接口表示一个网络框架的基本功能：事件循环。一个EventLoop将由一个永远都不会改变的Thread驱动，所有的I/O操作和事件都由已经被分配给了EventLoop的那个Thread来处理，也就是说，EventLoop所在的Thread将负责处理一个Channel的整个生命周期内的所有事件。
+
+=== EventLoop/线程的分配
+EventLoop包含在EventLoopGroup中。根据不同的传输实现，EventLoop的创建和分配方式也不同。
+
+==== 异步传输
+异步传输实现只使用了少量的EventLoop（以及和它们相关联的Thread），它们可能会被多个Channel所共享。这使得可以通过尽可能少量的Thread来支撑大量的Channel，而不是每个Channel分配一个Thread。
+
+EventLoopGroup负责为每个新创建的Channel分配一个EventLoop。一旦一个Channel被分配给一个EventLoop，它将在它的整个生命周期中都使用这个EventLoop（以及相关联的Thread）。
+
+诺曼·毛瑞尔(Norman Maurer),马文·艾伦·沃尔夫泰尔(Marvin Allen Wolfthal). Netty实战（异步图书） (Chinese Edition) (Kindle 位置 3699-3702). 人民邮电出版社. Kindle 版本. 
+
+==== 阻塞传输
+每一个Channel都将被分配给一个EventLoop（以及它的Thread）。如果应用程序使用过java.io包中的阻塞I/O实现，可能会使用这种模型。

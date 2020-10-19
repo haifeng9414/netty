@@ -1,0 +1,245 @@
+= 编解码器
+
+编码器用于将应用程序的数据转换为网络格式，也就是二进制。解码器用于将将网络格式转换为应用程序的数据。
+
+== 解码器
+解码器是负责将入站数据从一种格式转换到另一种格式的，常用的有两种类型：
+
+- ByteToMessageDecoder和ReplayingDecoder：将字节解码为消息；
+- MessageToMessageDecoder：将一种消息类型解码为另一种。
+
+=== 抽象类ByteToMessageDecoder
+用于将字节解码为消息（或者另一个字节序列），由于不可能知道远程节点是否会一次性地发送一个完整的消息，所以这个类会对入站数据进行缓冲，直到它准备好处理。如：
+[java]
+----
+// 扩展ByteToMessageDecoder类，以将字节解码为特定的格式
+public class ToIntegerDecoder extends ByteToMessageDecoder {
+    @Override
+    public void decode(ChannelHandlerContext ctx, ByteBuf in,
+        List<Object> out) throws Exception {
+        // 检查是否至少有4字节可读（一个 int 的字节长度）
+        if (in.readableBytes() >= 4) {
+            //从入站 ByteBuf 中读取一个 int，并将其添加到解码消息的 List 中
+            out.add(in.readInt());
+        }
+    }
+}
+----
+
+=== 抽象类ReplayingDecoder
+虽然ByteToMessageDecoder使得可以很简单地实现这种模式，但是在调用readInt()方法前不得不验证所输入的ByteBuf是否具有足够的数据有点繁琐。而ReplayingDecoder以少量的开销消除了这个步骤。它通过使用一个自定义的ByteBuf实现：ReplayingDecoderByteBuf，包装传入的ByteBuf实现了这一点，如：
+[java]
+----
+// 扩展ReplayingDecoder<Void>以将字节解码为消息
+public class ToIntegerDecoder2 extends ReplayingDecoder<Void> {
+
+    // 传入的ByteBuf是ReplayingDecoderByteBuf
+    @Override
+    public void decode(ChannelHandlerContext ctx, ByteBuf in, List<Object> out) throws Exception {
+        // 从入站 ByteBuf 中读取 一个 int，并将其添加到解码消息的 List 中
+        out.add(in.readInt());
+    }
+}
+----
+
+使用ReplayingDecoderByteBuf时应该注意下面这些方面：
+
+- 并不是所有的ByteBuf操作都被支持，如果调用了一个不被支持的方法，将会抛出一个UnsupportedOperationException；
+- ReplayingDecoder稍慢于ByteToMessageDecoder。如果使用ByteToMessageDecoder不会引入太多的复杂性，那么应该使用ByteToMessageDecoder
+
+=== 抽象类MessageToMessageDecoder
+用于两个消息格式之间进行转换，如将一个POJO类型转换为另一个，如：
+[java]
+----
+// 扩展了MessageToMessageDecoder<Integer>
+public class IntegerToStringDecoder extends MessageToMessageDecoder<Integer> {
+    @Override
+    public void decode(ChannelHandlerContext ctx, Integer msg,
+        List<Object> out) throws Exception {
+        //将 Integer 消息转换为它的 String 表示，并将其添加到输出的 List 中
+        out.add(String.valueOf(msg));
+    }
+}
+----
+
+=== TooLongFrameException类
+Netty是一个异步框架，所以需要在字节可以解码之前在内存中缓冲它们。因此，不能让解码器缓冲大量的数据以至于耗尽可用的内存。为了解除这个常见的顾虑，Netty提供了TooLongFrameException类，其将由解码器在帧超出指定的大小限制时抛出。如何处理该异常则完全取决于该解码器的用户。某些协议（如HTTP）可能允许返回一个特殊的响应。而在其他的情况下，唯一的选择可能就是关闭对应的连接。如：
+[java]
+----
+// 扩展ByteToMessageDecoder以将字节解码为消息
+public class SafeByteToMessageDecoder extends ByteToMessageDecoder {
+    private static final int MAX_FRAME_SIZE = 1024;
+    @Override
+    public void decode(ChannelHandlerContext ctx, ByteBuf in,
+        List<Object> out) throws Exception {
+            int readable = in.readableBytes();
+            // 检查缓冲区中是否有超过MAX_FRAME_SIZE个字节
+            if (readable > MAX_FRAME_SIZE) {
+                // 跳过所有的可读字节，抛出TooLongFrameException并通知 ChannelHandler
+                in.skipBytes(readable);
+                throw new TooLongFrameException("Frame too big!");
+        }
+        // do something
+        // ...
+    }
+}
+----
+
+== 编码器
+编码器负责将出站数据从一种格式转换为另一种格式
+
+=== 抽象类MessageToByteEncoder
+例子：
+[java]
+----
+// 扩展了MessageToByteEncoder
+public class ShortToByteEncoder extends MessageToByteEncoder<Short> {
+    @Override
+    public void encode(ChannelHandlerContext ctx, Short msg, ByteBuf out)
+        throws Exception {
+        // 将Short写入ByteBuf中
+        out.writeShort(msg);
+    }
+}
+----
+
+=== 抽象类MessageToMessageEncoder
+将出站数据从一种消息编码为另一种，如：
+[java]
+----
+// 扩展了MessageToMessageEncoder
+public class IntegerToStringEncoder
+    extends MessageToMessageEncoder<Integer> {
+    @Override
+    public void encode(ChannelHandlerContext ctx, Integer msg,
+        List<Object> out) throws Exception {
+        //将Integer转换为String，并将其添加到List中
+        out.add(String.valueOf(msg));
+    }
+}
+----
+
+== 编解码器类
+Netty中还有一种编解码器类，每个编解码器类都将捆绑一个解码器/编码器对，这些类同时实现了ChannelInboundHandler和ChannelOutboundHandler接口。
+
+=== 抽象类ByteToMessageCodec
+如果需要将字节解码为某种形式的消息，可能是POJO，随后再次对它进行编码。则应该使用ByteToMessageCodec，它结合了ByteToMessageDecoder以及它的逆向：MessageToByteEncoder。
+
+=== 抽象类MessageToMessageCodec
+通过使用MessageToMessageCodec，可以在一个单个的类中实现将一种消息格式转换为另外一种消息格式的往返过程。如：
+[java]
+----
+/**
+ * 使用MessageToMessageCodec
+ */
+@Sharable
+public class WebSocketConvertHandler extends
+     MessageToMessageCodec<WebSocketFrame,
+     WebSocketConvertHandler.MyWebSocketFrame> {
+     @Override
+     //将MyWebSocketFrame编码为指定的WebSocketFrame子类型
+     protected void encode(ChannelHandlerContext ctx,
+         WebSocketConvertHandler.MyWebSocketFrame msg,
+         List<Object> out) throws Exception {
+         ByteBuf payload = msg.getData().duplicate().retain();
+         //实例化一个指定子类型的WebSocketFrame
+         switch (msg.getType()) {
+             case BINARY:
+                 out.add(new BinaryWebSocketFrame(payload));
+                 break;
+             case TEXT:
+                 out.add(new TextWebSocketFrame(payload));
+                 break;
+             case CLOSE:
+                 out.add(new CloseWebSocketFrame(true, 0, payload));
+                 break;
+             case CONTINUATION:
+                 out.add(new ContinuationWebSocketFrame(payload));
+                 break;
+             case PONG:
+                 out.add(new PongWebSocketFrame(payload));
+                 break;
+             case PING:
+                 out.add(new PingWebSocketFrame(payload));
+                 break;
+             default:
+                 throw new IllegalStateException(
+                     "Unsupported websocket msg " + msg);}
+    }
+
+    @Override
+    //将WebSocketFrame解码为MyWebSocketFrame，并设置FrameType
+    protected void decode(ChannelHandlerContext ctx, WebSocketFrame msg,
+        List<Object> out) throws Exception {
+        ByteBuf payload = msg.content().duplicate().retain();
+        if (msg instanceof BinaryWebSocketFrame) {
+            out.add(new MyWebSocketFrame(
+                    MyWebSocketFrame.FrameType.BINARY, payload));
+        } else
+        if (msg instanceof CloseWebSocketFrame) {
+            out.add(new MyWebSocketFrame (
+                    MyWebSocketFrame.FrameType.CLOSE, payload));
+        } else
+        if (msg instanceof PingWebSocketFrame) {
+            out.add(new MyWebSocketFrame (
+                    MyWebSocketFrame.FrameType.PING, payload));
+        } else
+        if (msg instanceof PongWebSocketFrame) {
+            out.add(new MyWebSocketFrame (
+                    MyWebSocketFrame.FrameType.PONG, payload));
+        } else
+        if (msg instanceof TextWebSocketFrame) {
+            out.add(new MyWebSocketFrame (
+                    MyWebSocketFrame.FrameType.TEXT, payload));
+        } else
+        if (msg instanceof ContinuationWebSocketFrame) {
+            out.add(new MyWebSocketFrame (
+                    MyWebSocketFrame.FrameType.CONTINUATION, payload));
+        } else
+        {
+            throw new IllegalStateException(
+                    "Unsupported websocket msg " + msg);
+        }
+    }
+
+    //声明 WebSocketConvertHandler 所使用的 OUTBOUND_IN 类型
+    public static final class MyWebSocketFrame {
+        //定义拥有被包装的有效负载的 WebSocketFrame 的类型
+        public enum FrameType {
+            BINARY,
+            CLOSE,
+            PING,
+            PONG,
+            TEXT,
+            CONTINUATION
+        }
+        private final FrameType type;
+        private final ByteBuf data;
+
+        public MyWebSocketFrame(FrameType type, ByteBuf data) {
+            this.type = type;
+            this.data = data;
+        }
+        public FrameType getType() {
+            return type;
+        }
+        public ByteBuf getData() {
+            return data;
+        }
+    }
+}
+----
+
+=== CombinedChannelDuplexHandler类
+结合一个解码器和编码器可能会对可重用性造成影响，通过CombinedChannelDuplexHandler类可以避免这种情况。这个类充当了ChannelInboundHandler和ChannelOutboundHandler的容器。通过提供分别继承了解码器类和编码器类的类型，通过该类可以实现一个编解码器，而又不必直接扩展抽象的编解码器类。如：
+[java]
+----
+// 通过该解码器和编码器实现参数化CombinedByteCharCodec
+public class CombinedByteCharCodec extends
+    CombinedChannelDuplexHandler<ByteToCharDecoder, CharToByteEncoder> {
+    public CombinedByteCharCodec() {
+        // 将委托实例传递给父类
+        super(new ByteToCharDecoder(), new CharToByteEncoder());
+    }
+}
+----

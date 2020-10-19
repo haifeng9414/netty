@@ -1,0 +1,398 @@
+= 预置的预置的ChannelHandler和编解码器
+
+== SslHandler
+SslHandler用于实现SSL/TLS，分别基于OpenSSL和基于JDK的实现，两种实现的API是一样的，但是OpenSSL的性能更好。
+
+在大多数情况下，SslHandler将是ChannelPipeline中的第一个ChannelHandler。如：
+[java]
+----
+/**
+ * 添加SSL/TLS支持
+ */
+public class SslChannelInitializer extends ChannelInitializer<Channel> {
+    private final SslContext context;
+    private final boolean startTls;
+
+    public SslChannelInitializer(SslContext context,     // 传入要使用的 SslContext
+        boolean startTls) {                              // 如果设置为true，第一个写入的消息将不会被加密（客户端应该设置为true）
+        this.context = context;
+        this.startTls = startTls;
+    }
+    @Override
+    protected void initChannel(Channel ch) throws Exception {
+        //对于每个SslHandler实例，都使用Channel的ByteBufAllocator从SslContext获取一个新的SSLEngine
+        SSLEngine engine = context.newEngine(ch.alloc());
+        //将SslHandler作为第一个ChannelHandler添加到ChannelPipeline中
+        ch.pipeline().addFirst("ssl",
+            new SslHandler(engine, startTls));
+    }
+}
+----
+
+== HTTP/HTTPS应用程序
+=== 添加HTTP支持
+[java]
+----
+/**
+ * 添加HTTP支持
+ */
+public class HttpPipelineInitializer extends ChannelInitializer<Channel> {
+    private final boolean client;
+
+    public HttpPipelineInitializer(boolean client) {
+        this.client = client;
+    }
+
+    @Override
+    protected void initChannel(Channel ch) throws Exception {
+        ChannelPipeline pipeline = ch.pipeline();
+        if (client) {
+            // 如果是客户端，则添加HttpResponseDecoder以处理来自服务器的响应
+            pipeline.addLast("decoder", new HttpResponseDecoder());
+            // 如果是客户端，则添加HttpRequestEncoder以向服务器发送请求
+            pipeline.addLast("encoder", new HttpRequestEncoder());
+        } else {
+            // 如果是服务器，则添加HttpRequestDecoder以接收来自客户端的请求
+            pipeline.addLast("decoder", new HttpRequestDecoder());
+            // 如果是服务器，则添加HttpResponseEncoder以向客户端发送响应
+            pipeline.addLast("encoder", new HttpResponseEncoder());
+        }
+    }
+}
+----
+
+=== 聚合HTTP消息
+在ChannelInitializer将ChannelHandler安装到ChannelPipeline中之后，便可以处理不同类型的HttpObject消息了。但是由于HTTP的请求和响应可能由许多部分组成，因此需要聚合它们以形成完整的消息。为了消除这项繁琐的任务，Netty提供了一个聚合器，它可以将多个消息部分合并为FullHttpRequest或者FullHttpResponse消息。通过这样的方式，将总是看到完整的消息内容。如：
+[java]
+----
+/**
+ * 自动聚合HTTP的消息片段
+ */
+public class HttpAggregatorInitializer extends ChannelInitializer<Channel> {
+    private final boolean isClient;
+
+    public HttpAggregatorInitializer(boolean isClient) {
+        this.isClient = isClient;
+    }
+
+    @Override
+    protected void initChannel(Channel ch) throws Exception {
+        ChannelPipeline pipeline = ch.pipeline();
+        if (isClient) {
+            // 如果是客户端，则添加HttpClientCodec
+            pipeline.addLast("codec", new HttpClientCodec());
+        } else {
+            // 如果是服务器，则添加HttpServerCodec
+            pipeline.addLast("codec", new HttpServerCodec());
+        }
+        // 将最大的消息大小为512KB的HttpObjectAggregator添加到ChannelPipeline
+        pipeline.addLast("aggregator",
+                new HttpObjectAggregator(512 * 1024));
+    }
+}
+----
+
+=== HTTP压缩
+当使用HTTP时，建议开启压缩功能以尽可能多地减小传输数据的大小。虽然压缩会带来一些CPU时钟周期上的开销，但是能够提高网络利用率，特别是对于文本数据来说。
+[java]
+----
+/**
+ * 自动压缩HTTP消息
+ */
+public class HttpCompressionInitializer extends ChannelInitializer<Channel> {
+    private final boolean isClient;
+
+    public HttpCompressionInitializer(boolean isClient) {
+        this.isClient = isClient;
+    }
+
+    @Override
+    protected void initChannel(Channel ch) throws Exception {
+        ChannelPipeline pipeline = ch.pipeline();
+        if (isClient) {
+            // 如果是客户端，则添加HttpClientCodec
+            pipeline.addLast("codec", new HttpClientCodec());
+            // 如果是客户端，则添加HttpContentDecompressor以处理来自服务器的压缩内容
+            pipeline.addLast("decompressor",
+            new HttpContentDecompressor());
+        } else {
+            // 如果是服务器，则添加HttpServerCodec
+            pipeline.addLast("codec", new HttpServerCodec());
+            // 如果是服务器，则添加HttpContentCompressor来压缩数据（如果客户端支持它）
+            pipeline.addLast("compressor",
+            new HttpContentCompressor());
+        }
+    }
+}
+----
+
+=== 使用HTTPS
+启用HTTPS只需要将SslHandler添加到ChannelPipeline的ChannelHandler组合中，如：
+[java]
+----
+/**
+ * 使用HTTPS
+ */
+public class HttpsCodecInitializer extends ChannelInitializer<Channel> {
+    private final SslContext context;
+    private final boolean isClient;
+
+    public HttpsCodecInitializer(SslContext context, boolean isClient) {
+        this.context = context;
+        this.isClient = isClient;
+    }
+
+    @Override
+    protected void initChannel(Channel ch) throws Exception {
+        ChannelPipeline pipeline = ch.pipeline();
+        SSLEngine engine = context.newEngine(ch.alloc());
+        //将SslHandler添加到ChannelPipeline中以使用HTTPS
+        pipeline.addFirst("ssl", new SslHandler(engine));
+
+        if (isClient) {
+            // 如果是客户端，则添加HttpClientCodec
+            pipeline.addLast("codec", new HttpClientCodec());
+        } else {
+            // 如果是服务器，则添加HttpServerCodec
+            pipeline.addLast("codec", new HttpServerCodec());
+        }
+    }
+}
+----
+
+=== WebSocket
+WebSocket提供了在一个单个的TCP连接上提供双向的通信的能力，它为网页和远程服务器之间的双向通信提供了一种替代HTTP轮询的方案。
+添加对于WebSocket的支持，需要将适当的客户端或者服务器WebSocketChannelHandler添加到ChannelPipeline中。这个类将处理由WebSocket定义的称为帧的特殊消息类型，包括：
+
+- BinaryWebSocketFrame：数据帧，二进制数据
+- TextWebSocketFrame：数据帧，文本数据
+- ContinuationWebSocketFrame：数据帧，属于上一个BinaryWebSocketFrame或者TextWebSocketFrame的文本的二进制数据
+- CloseWebSocketFrame：控制帧，包含一个CLOSE请求、关闭的状态码以及关闭的原因
+- PingWebSocketFrame：控制帧，请求一个PongWebSocketFrame
+- PongWebSocketFrame：控制帧，对PingWebSocketFrame请求的响应
+
+例子：
+[java]
+----
+/**
+ * 在服务器端支持WebSocket
+ */
+public class WebSocketServerInitializer extends ChannelInitializer<Channel> {
+    @Override
+    protected void initChannel(Channel ch) throws Exception {
+        ch.pipeline().addLast(
+            new HttpServerCodec(),
+            // 为握手提供聚合的HttpRequest
+            new HttpObjectAggregator(65536),
+            // 如果被请求的端点是"/websocket"，则处理该升级握手
+            new WebSocketServerProtocolHandler("/websocket"),
+            // TextFrameHandler处理TextWebSocketFrame
+            new TextFrameHandler(),
+            // BinaryFrameHandler处理BinaryWebSocketFrame
+            new BinaryFrameHandler(),
+            // ContinuationFrameHandler处理ContinuationWebSocketFrame
+            new ContinuationFrameHandler());
+    }
+
+    public static final class TextFrameHandler extends
+        SimpleChannelInboundHandler<TextWebSocketFrame> {
+        @Override
+        public void channelRead0(ChannelHandlerContext ctx,
+            TextWebSocketFrame msg) throws Exception {
+            // Handle text frame
+        }
+    }
+
+    public static final class BinaryFrameHandler extends
+        SimpleChannelInboundHandler<BinaryWebSocketFrame> {
+        @Override
+        public void channelRead0(ChannelHandlerContext ctx,
+            BinaryWebSocketFrame msg) throws Exception {
+            // Handle binary frame
+        }
+    }
+
+    public static final class ContinuationFrameHandler extends
+        SimpleChannelInboundHandler<ContinuationWebSocketFrame> {
+        @Override
+        public void channelRead0(ChannelHandlerContext ctx,
+            ContinuationWebSocketFrame msg) throws Exception {
+            // Handle continuation frame
+        }
+    }
+}
+----
+
+=== 空闲的连接和超时
+用于空闲连接以及超时的ChannelHandler：
+
+- IdleStateHandler：当连接空闲时间太长时，将会触发一个IdleStateEvent事件。然后可以通过在ChannelInboundHandler中重写userEventTriggered()方法来处理该IdleStateEvent事件
+- ReadTimeoutHandler：如果在指定的时间间隔内没有收到任何的入站数据，则抛出一个ReadTimeoutException并关闭对应的Channel。可以通过重写ChannelHandler中的exceptionCaught()方法来检测该ReadTimeoutException
+- WriteTimeoutHandler：如果在指定的时间间隔内没有任何出站数据写入，则抛出一个WriteTimeoutException并关闭对应的Channel。可以通过重写ChannelHandler的exceptionCaught()方法检测该WriteTimeoutException
+
+例子：
+[java]
+----
+/**
+ * 发送心跳
+ */
+public class IdleStateHandlerInitializer extends ChannelInitializer<Channel>
+    {
+    @Override
+    protected void initChannel(Channel ch) throws Exception {
+        ChannelPipeline pipeline = ch.pipeline();
+        pipeline.addLast(
+                // IdleStateHandler将在被触发时发送一个IdleStateEvent事件
+                new IdleStateHandler(0, 0, 60, TimeUnit.SECONDS));
+        // 将一个HeartbeatHandler添加到ChannelPipeline中
+        pipeline.addLast(new HeartbeatHandler());
+    }
+
+    // 实现userEventTriggered()方法以发送心跳消息
+    public static final class HeartbeatHandler
+        extends ChannelInboundHandlerAdapter {
+        // 发送到远程节点的心跳消息
+        private static final ByteBuf HEARTBEAT_SEQUENCE =
+                Unpooled.unreleasableBuffer(Unpooled.copiedBuffer(
+                "HEARTBEAT", CharsetUtil.ISO_8859_1));
+        @Override
+        public void userEventTriggered(ChannelHandlerContext ctx,
+            Object evt) throws Exception {
+            // 发送心跳消息，并在发送失败时关闭该连接
+            if (evt instanceof IdleStateEvent) {
+                ctx.writeAndFlush(HEARTBEAT_SEQUENCE.duplicate())
+                     .addListener(
+                         ChannelFutureListener.CLOSE_ON_FAILURE);
+            } else {
+                // 不是IdleStateEvent事件，所以将它传递给下一个ChannelInboundHandler
+                super.userEventTriggered(ctx, evt);
+            }
+        }
+    }
+}
+----
+
+=== 解码基于分隔符的协议和基于长度的协议
+Netty提供了一些基于分隔符和帧长度实现编解码的ChannelHander
+
+==== 基于分隔符的ChannelHander
+基于分隔符的（delimited）消息协议使用定义的字符来标记的消息或者消息段（通常被称为帧）的开头或者结尾。如SMTP、POP3、IMAP以及Telnet
+
+基于分隔符的ChannelHander有：
+
+- DelimiterBasedFrameDecoder：使用任何由用户提供的分隔符来提取帧的通用解码器- LineBasedFrameDecoder：提取由行尾符（\n或者\r\n）分隔的帧的解码器。这个解码器比DelimiterBasedFrameDecoder更快
+
+例子：
+[java]
+----
+/**
+ * 处理由行尾符分隔的帧
+ */
+public class LineBasedHandlerInitializer extends ChannelInitializer<Channel>
+    {
+    @Override
+    protected void initChannel(Channel ch) throws Exception {
+        ChannelPipeline pipeline = ch.pipeline();
+        // 该LineBasedFrameDecoder将提取的帧转发给下一个ChannelInboundHandler
+        pipeline.addLast(new LineBasedFrameDecoder(64 * 1024));
+        // 添加FrameHandler以接收帧
+        pipeline.addLast(new FrameHandler());
+    }
+
+    public static final class FrameHandler
+        extends SimpleChannelInboundHandler<ByteBuf> {
+        @Override
+        // 传入了单个帧的内容
+        public void channelRead0(ChannelHandlerContext ctx,
+            ByteBuf msg) throws Exception {
+            // Do something with the data extracted from the frame
+        }
+    }
+}
+----
+
+==== 基于长度的ChannelHander
+基于分隔符的ChannelHander有：
+
+- FixedLengthFrameDecoder：提取在调用构造函数时指定的定长帧
+- LengthFieldBasedFrameDecoder：根据编码进帧头部中的长度值提取帧；该字段的偏移量以及长度在构造函数中指定
+
+例子：
+[java]
+----
+/**
+ * LengthFieldBasedFrameDecoder解码器基于长度的协议
+ */
+public class LengthBasedInitializer extends ChannelInitializer<Channel> {
+    @Override
+    protected void initChannel(Channel ch) throws Exception {
+        ChannelPipeline pipeline = ch.pipeline();
+        pipeline.addLast(
+                // 使用LengthFieldBasedFrameDecoder解码将帧长度编码到帧起始的前8个字节中的消息
+                new LengthFieldBasedFrameDecoder(64 * 1024, 0, 8));
+        //添加 FrameHandler 以处理每个帧
+        pipeline.addLast(new FrameHandler());
+    }
+
+    public static final class FrameHandler
+        extends SimpleChannelInboundHandler<ByteBuf> {
+        @Override
+        public void channelRead0(ChannelHandlerContext ctx,
+             ByteBuf msg) throws Exception {
+            // Do something with the frame
+            // 处理帧的数据
+        }
+    }
+}
+----
+
+=== 使用零拷贝
+Netty中可以使用一个FileRegion接口的实现完成零拷贝，FileRegion接口表示通过支持零拷贝的文件传输的Channel来发送的文件区域。
+
+例子：
+[java]
+----
+/**
+ * 使用零拷贝
+ */
+public class FileRegionWriteHandler extends ChannelInboundHandlerAdapter {
+    private static final Channel CHANNEL_FROM_SOMEWHERE = new NioSocketChannel();
+    private static final File FILE_FROM_SOMEWHERE = new File("");
+
+    @Override
+    public void channelActive(final ChannelHandlerContext ctx) throws Exception {
+        File file = FILE_FROM_SOMEWHERE; // get reference from somewhere
+        Channel channel = CHANNEL_FROM_SOMEWHERE; // get reference from somewhere
+        //...
+        // 创建一个FileInputStream
+        FileInputStream in = new FileInputStream(file);
+        // 以该文件的完整长度创建一个新的DefaultFileRegion
+        FileRegion region = new DefaultFileRegion(
+                in.getChannel(), 0, file.length());
+        // 发送该DefaultFileRegion，并注册一个ChannelFutureListener
+        channel.writeAndFlush(region).addListener(
+            new ChannelFutureListener() {
+            @Override
+            public void operationComplete(ChannelFuture future)
+               throws Exception {
+               if (!future.isSuccess()) {
+                   // 处理失败
+                   Throwable cause = future.cause();
+                   // Do something
+               }
+            }
+        });
+    }
+}
+----
+
+=== 序列化和反序列化
+序列化用于将POJO转换为字节流，用于网络传输。
+
+Netty中常用的序列化方式：
+
+. JDK序列化
+. JBoss Marshalling序列化：JBoss Marshalling比JDK序列化最多快3倍，而且也更加紧凑。Netty使用两组解码器/编码器对为Boss Marshalling提供了支持。第一组兼容只使用JDK序列化的远程节点。第二组提供了最大的性能，适用于和使用JBoss Marshalling的远程节点一起使用：
+.. CompatibleMarshallingDecoder、CompatibleMarshallingEncoder：与只使用JDK序列化的远程节点兼容
+.. MarshallingDecoder、MarshallingEncoder：适用于使用JBossMarshalling的节点。这些类必须一起使用
+. Protocol Buffers序列化

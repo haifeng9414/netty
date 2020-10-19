@@ -1,0 +1,125 @@
+= Netty学习
+
+== 基础
+=== 核心接口
+==== Channel接口
+基本的I/O操作（bind()、connect()、read()和write()）依赖于底层网络传输所提供的原语。在基于Java的网络编程中，其基本的构造是classSocket。Netty的Channel接口所提供的API，大大地降低了直接使用Socket类的复杂性。
+
+Channel有以下生命周期状态：
+
+- ChannelRegistered：Channel已经被注册到了EventLoop
+- ChannelActive：Channel处于活动状态（已经连接到它的远程节点）。它现在可以接收和发送数据了
+- ChannelInactive：Channel没有连接到远程节点
+- ChannelUnregistered：Channel已经被创建，但还未注册到EventLoop
+
+当这些状态发生改变时，将会生成对应的事件。这些事件将会被转发给ChannelPipeline中的ChannelHandler，状态的转变模型为：ChannelRegistered -> ChannelActive -> ChannelInactive -> ChannelUnregistered
+
+==== EventLoop和EventLoopGroup接口
+EventLoop定义了Netty的核心抽象，用于处理连接的生命周期中所发生的事件。
+
+- 一个EventLoopGroup包含一个或者多个EventLoop；
+- 一个EventLoop在它的生命周期内只和一个Thread绑定；
+- 所有由EventLoop处理的I/O事件都将在它专有的Thread上被处理；
+- 一个Channel在它的生命周期内只注册于一个EventLoop；
+- 一个EventLoop可能会被分配给一个或多个Channel。
+
+在这种设计中，一个给定Channel的I/O操作都是由相同的Thread执行的，消除了对于同步的需要。
+
+==== ChannelFuture接口
+Netty中所有的I/O操作都是异步的。因为一个操作可能不会立即返回，所以需要一种用于在之后的某个时间点确定其结果的方法。为此，Netty提供了ChannelFuture接口，其addListener()方法注册了一个ChannelFutureListener，以便在某个操作完成时（无论是否成功）得到通知。
+
+==== ChannelHandler接口
+从应用程序开发人员的角度来看，Netty的主要组件是ChannelHandler，它充当了所有处理入站和出站数据的应用程序逻辑的容器。举例来说，ChannelInboundHandler是一个经常实现的子接口。这种类型的ChannelHandler接收入站事件和数据，这些数据随后将会被应用程序的业务逻辑所处理。当要给连接的客户端发送响应时，也可以从ChannelInboundHandler冲刷数据。应用程序的业务逻辑通常驻留在一个或者多个ChannelInboundHandler中。
+
+ChannelHandler有以下生命周期事件：
+
+- handlerAdded：当把ChannelHandler添加到ChannelPipeline中时被调用
+- handlerRemoved：当从ChannelPipeline中移除ChannelHandler时被调用
+- exceptionCaught：ChannelPipeline处理过程中有错误产生时被调用
+
+==== ChannelPipeline接口
+ChannelPipeline提供了ChannelHandler链的容器，并定义了用于在该链上传播入站和出站事件流的API。当Channel被创建时，它会被自动地分配到它专属的ChannelPipeline。
+
+ChannelHandler安装到ChannelPipeline中的过程如下所示：
+
+- 一个ChannelInitializer的实现被注册到了ServerBootstrap中；
+- 当ChannelInitializer.initChannel()方法被调用时，ChannelInitializer将在ChannelPipeline中安装一组自定义的ChannelHandler；
+- ChannelInitializer将它自己从ChannelPipeline中移除。
+
+事件流经ChannelPipeline并交由保存其中的ChannelHandler处理，这些ChannelHandler接收事件、执行它们所实现的处理逻辑，并将数据传递给链中的下一个ChannelHandler。它们的执行顺序是由它们被添加的顺序所决定的。
+
+当ChannelHandler被添加到ChannelPipeline时，它将会被分配一个ChannelHandlerContext，其代表了ChannelHandler和ChannelPipeline之间的绑定。虽然这个对象可以被用于获取底层的Channel，但是它主要还是被用于写出站数据。在Netty中，有两种发送消息的方式。你可以直接写到Channel中，也可以写到和ChannelHandler相关联的ChannelHandlerContext对象中。前一种方式将会导致消息从ChannelPipeline的尾端开始流动，而后者将导致消息从ChannelPipeline中的下一个ChannelHandler开始流动。
+
+==== ChannelHandlerContext接口
+ChannelHandlerContext代表了ChannelHandler和ChannelPipeline之间的关联，每当有ChannelHandler添加到ChannelPipeline中时，都会创建ChannelHandlerContext。ChannelHandlerContext的主要功能是管理它所关联的ChannelHandler和在同一个ChannelPipeline中的其他ChannelHandler之间的交互。
+
+ChannelHandlerContext有很多的方法，其中一些方法也存在于Channel和ChannelPipeline本身上。如果调用Channel或者ChannelPipeline上的这些方法，它们将沿着整个ChannelPipeline进行传播。而调用位于ChannelHandlerContext上的相同方法，则将从当前所关联的ChannelHandler开始，并且只会传播给位于该ChannelPipeline中的下一个能够处理该事件的ChannelHandler。
+
+使用ChannelHandlerContext的API的时候，牢记以下两点：
+
+- ChannelHandlerContext和ChannelHandler之间的关联（绑定）是永远不会改变的，所以缓存对它的引用是安全的；
+- ChannelHandlerContext的方法将产生更短的事件流，应该尽可能地利用这个特性来获得最大的性能。
+
+=== 引导
+Netty的引导类为应用程序的网络层配置提供了容器，这涉及将一个进程绑定到某个指定的端口，或者将一个进程连接到另一个运行在某个指定主机的指定端口上的进程。通常来说，前面的用例称作引导一个服务器，后面的用例称作引导一个客户端。因此，有两种类型的引导：一种用于客户端（简单地称为Bootstrap），而另一种（ServerBootstrap）用于服务器。无论你的应用程序使用哪种协议或者处理哪种类型的数据，唯一决定它使用哪种引导类的是它是作为一个客户端还是作为一个服务器。
+通常引导一个客户端只需要一个EventLoopGroup，但是一个ServerBootstrap则需要两个（也可以是同一个EventLoopGroup）。因为服务器需要两组不同的Channel，第一组将只包含一个ServerChannel，代表服务器自身的已绑定到某个本地端口的正在监听的套接字。而第二组将包含所有已创建的用来处理传入客户端连接（对于每个服务器已经接受的连接都有一个）的Channel。与ServerChannel相关联的EventLoopGroup中的EventLoop负责为传入连接请求创建Channel。一旦连接被接受，第二个EventLoopGroup就会给新建的Channel分配一个EventLoop。
+
+=== ByteBuf
+JavaNIO提供了ByteBuffer作为字节容器，但是这个类使用起来过于复杂，而且也有些繁琐。Netty的ByteBuffer替代品是ByteBuf，为网络应用程序的开发者提供了更好的API。
+
+下面是一些ByteBufAPI的优点：
+
+- 它可以被用户自定义的缓冲区类型扩展；
+- 通过内置的复合缓冲区类型实现了透明的零拷贝；
+- 容量可以按需增长（类似于JDK的StringBuilder）；
+- 在读和写这两种模式之间切换不需要调用ByteBuffer的flip()方法；
+- 读和写使用了不同的索引；
+- 支持方法的链式调用；
+- 支持引用计数；
+- 支持池化。
+
+ByteBuf的工作方式是，ByteBuf维护了两个不同的索引，readerIndex和writerIndex：一个用于读取，一个用于写入。当从ByteBuf读取时，readerIndex将会被递增已经被读取的字节数。同样地，写入ByteBuf时，writerIndex也会被递增。readerIndex和writerIndex的起始位置都是0。名称以read或者write开头的ByteBuf方法将会推进其对应的索引，而名称以set或者get开头的操作则不会。
+
+如果readerIndex和writerIndex相等，试图读取时将会触发一个IndexOutOfBoundsException。可以指定ByteBuf的最大容量，试图移动写索引超过这个值将会触发一个异常。
+
+ByteBuf的有以下几种使用模式：
+
+- 堆缓冲区：顾名思义，字节数据被保存在JVM堆中，这种模式被称为支撑数组（backingarray），它能在没有使用池化的情况下提供快速的分配和释放：
+[java]
+----
+public static void heapBuffer() {
+    ByteBuf heapBuf = BYTE_BUF_FROM_SOMEWHERE; //get reference form somewhere
+    // 检查ByteBuf是否有一个支撑数组
+    if (heapBuf.hasArray()) {
+        // 只有存在支撑数组时才能获取对该数组的引用，否则会抛出异常
+        byte[] array = heapBuf.array();
+        // 计算第一个字节的偏移量
+        int offset = heapBuf.arrayOffset() + heapBuf.readerIndex();
+        // 获得可读字节数
+        int length = heapBuf.readableBytes();
+        // 使用数组、偏移量和长度作为参数调用你的方法
+        handleArray(array, offset, length);
+    }
+}
+----
+- 直接缓冲区：数据被保存在JVM堆之外，使用直接缓冲区能够避免在每次调用本地I/O操作之前（或者之后）将缓冲区的内容复制到一个中间缓冲区（或者从中间缓冲区把内容复制到缓冲区）。直接缓冲区的主要缺点是，相对于基于堆的缓冲区，它们的分配和释放都较为昂贵。如果正在处理遗留代码，也可能会遇到另外一个缺点：因为数据不是在堆上，所以不得不进行一次复制，如：
+[java]
+----
+public static void directBuffer() {
+    ByteBuf directBuf = BYTE_BUF_FROM_SOMEWHERE; //get reference form somewhere
+    // 检查ByteBuf是否由数组支撑。如果不是，则这是一个直接缓冲区
+    if (!directBuf.hasArray()) {
+        // 获取可读字节数
+        int length = directBuf.readableBytes();
+        // 分配一个新的数组来保存具有该长度的字节数据
+        byte[] array = new byte[length];
+        // 将字节复制到该数组
+        directBuf.getBytes(directBuf.readerIndex(), array);
+        // 使用数组、偏移量和长度作为参数调用你的方法
+        handleArray(array, 0, length);
+    }
+}
+----
+- 复合缓冲区：为多个ByteBuf提供一个聚合视图，可以根据需要添加或者删除ByteBuf实例。Netty通过一个ByteBuf子类CompositeByteBuf实现了这个模式，它提供了一个将多个缓冲区表示为单个合并缓冲区的虚拟表示。
+
+CompositeByteBuf中的ByteBuf实例可能同时包含直接内存分配和非直接内存分配。如果其中只有一个实例，那么对CompositeByteBuf上的hasArray()方法的调用将返回该组件上的hasArray()方法的值；否则它将返回false。

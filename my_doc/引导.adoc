@@ -1,0 +1,191 @@
+= 引导
+
+Netty中引导用于将应用程序和网络相隔离，引导有两个：
+
+- Bootstrap类：用于客户端或者使用了无连接协议的应用程序中，如：
+[java]
+----
+/**
+* 引导一个客户端
+* 
+*/
+public void bootstrap() {
+    //设置 EventLoopGroup，提供用于处理 Channel 事件的 EventLoop
+    EventLoopGroup group = new NioEventLoopGroup();
+    //创建一个Bootstrap类的实例以创建和连接新的客户端Channel
+    Bootstrap bootstrap = new Bootstrap();
+    bootstrap.group(group)
+        //指定要使用的Channel 实现
+        .channel(NioSocketChannel.class)
+        //设置用于 Channel 事件和数据的ChannelInboundHandler
+        .handler(new SimpleChannelInboundHandler<ByteBuf>() {
+            @Override
+            protected void channelRead0(
+                ChannelHandlerContext channelHandlerContext,
+                ByteBuf byteBuf) throws Exception {
+                System.out.println("Received data");
+            }
+            });
+    //连接到远程主机
+    ChannelFuture future = bootstrap.connect(
+        new InetSocketAddress("www.manning.com", 80));
+    future.addListener(new ChannelFutureListener() {
+        @Override
+        public void operationComplete(ChannelFuture channelFuture)
+            throws Exception {
+            if (channelFuture.isSuccess()) {
+                System.out.println("Connection established");
+            } else {
+                System.err.println("Connection attempt failed");
+                channelFuture.cause().printStackTrace();
+            }
+        }
+    });
+}
+----
+
+- ServerBootstrap类：用于服务器应用程序，如：
+[java]
+----
+/**
+ * 引导服务器
+ * 
+ */
+public void bootstrap() {
+    NioEventLoopGroup group = new NioEventLoopGroup();
+    //创建 Server Bootstrap
+    ServerBootstrap bootstrap = new ServerBootstrap();
+    //设置 EventLoopGroup，其提供了用于处理 Channel 事件的EventLoop
+    bootstrap.group(group)
+        //指定要使用的 Channel 实现
+        .channel(NioServerSocketChannel.class)
+        //设置用于处理已被接受的子 Channel 的I/O及数据的 ChannelInboundHandler
+        .childHandler(new SimpleChannelInboundHandler<ByteBuf>() {
+            @Override
+            protected void channelRead0(ChannelHandlerContext channelHandlerContext,
+                ByteBuf byteBuf) throws Exception {
+                System.out.println("Received data");
+            }
+        });
+    //通过配置好的 ServerBootstrap 的实例绑定该 Channel
+    ChannelFuture future = bootstrap.bind(new InetSocketAddress(8080));
+    future.addListener(new ChannelFutureListener() {
+        @Override
+        public void operationComplete(ChannelFuture channelFuture)
+            throws Exception {
+            if (channelFuture.isSuccess()) {
+                System.out.println("Server bound");
+            } else {
+                System.err.println("Bind attempt failed");
+                channelFuture.cause().printStackTrace();
+            }
+        }
+    });
+}
+----
+
+== 从Channel引导客户端
+假设服务器正在处理一个客户端的请求，这个请求需要它充当第三方系统的客户端。当一个应用程序（如一个代理服务器）必须要和组织现有的系统（如Web服务或者数据库）集成时，就可能发生这种情况。在这种情况下，将需要从已经被接受的子Channel中引导一个客户端Channel。
+
+如果为每个子Channel都创建一个新的Bootstrap实例无疑是低效的，因为这将要求为每个新创建的客户端Channel定义另一个EventLoop。这会产生额外的线程，以及在已被接受的子Channel和客户端Channel之间交换数据时不可避免的上下文切换。
+
+一个更好的解决方案是：通过将已被接受的子Channel的EventLoop传递给Bootstrap的group()方法来共享该EventLoop。因为分配给EventLoop的所有Channel都使用同一个线程，所以这避免了额外的线程创建，以及相关的上下文切换。如：
+[java]
+----
+/**
+ * 引导服务器
+ * 
+ */
+public void bootstrap() {
+    //创建 ServerBootstrap 以创建 ServerSocketChannel，并绑定它
+    ServerBootstrap bootstrap = new ServerBootstrap();
+    //设置 EventLoopGroup，其将提供用以处理 Channel 事件的 EventLoop
+    bootstrap.group(new NioEventLoopGroup(), new NioEventLoopGroup())
+        //指定要使用的 Channel 实现
+        .channel(NioServerSocketChannel.class)
+        //设置用于处理已被接受的子 Channel 的 I/O 和数据的 ChannelInboundHandler
+        .childHandler(
+            new SimpleChannelInboundHandler<ByteBuf>() {
+                ChannelFuture connectFuture;
+                @Override
+                public void channelActive(ChannelHandlerContext ctx)
+                    throws Exception {
+                    //创建一个 Bootstrap 类的实例以连接到远程主机
+                    Bootstrap bootstrap = new Bootstrap();
+                    //指定 Channel 的实现
+                    bootstrap.channel(NioSocketChannel.class).handler(
+                        //为入站 I/O 设置 ChannelInboundHandler
+                        new SimpleChannelInboundHandler<ByteBuf>() {
+                            @Override
+                            protected void channelRead0(
+                                ChannelHandlerContext ctx, ByteBuf in)
+                                throws Exception {
+                                System.out.println("Received data");
+                            }
+                        });
+                    //使用与分配给已被接受的子Channel相同的EventLoop
+                    bootstrap.group(ctx.channel().eventLoop());
+                    connectFuture = bootstrap.connect(
+                        //连接到远程节点
+                        new InetSocketAddress("www.manning.com", 80));
+                }
+
+                @Override
+                protected void channelRead0(
+                    ChannelHandlerContext channelHandlerContext,
+                        ByteBuf byteBuf) throws Exception {
+                    if (connectFuture.isDone()) {
+                        //当连接完成时，执行一些数据操作（如代理）
+                        // do something with the data
+                    }
+                }
+            });
+    //通过配置好的 ServerBootstrap 绑定该 ServerSocketChannel
+    ChannelFuture future = bootstrap.bind(new InetSocketAddress(8080));
+    future.addListener(new ChannelFutureListener() {
+        @Override
+        public void operationComplete(ChannelFuture channelFuture)
+            throws Exception {
+            if (channelFuture.isSuccess()) {
+                System.out.println("Server bound");
+            } else {
+                System.err.println("Bind attempt failed");
+                channelFuture.cause().printStackTrace();
+            }
+        }
+    });
+}
+----
+
+== 关闭Bootstrap
+[java]
+----
+/**
+ * 优雅关闭
+ */
+public void bootstrap() {
+    //创建处理 I/O 的EventLoopGroup
+    EventLoopGroup group = new NioEventLoopGroup();
+    //创建一个 Bootstrap 类的实例并配置它
+    Bootstrap bootstrap = new Bootstrap();
+    bootstrap.group(group)
+         .channel(NioSocketChannel.class)
+    //...
+         .handler(
+            new SimpleChannelInboundHandler<ByteBuf>() {
+                @Override
+                protected void channelRead0(
+                        ChannelHandlerContext channelHandlerContext,
+                        ByteBuf byteBuf) throws Exception {
+                    System.out.println("Received data");
+                }
+            }
+         );
+    bootstrap.connect(new InetSocketAddress("www.manning.com", 80)).syncUninterruptibly();
+    //,,,
+    //shutdownGracefully()方法将释放所有的资源，并且关闭所有的当前正在使用中的 Channel
+    Future<?> future = group.shutdownGracefully();
+    // 阻塞等待关闭完成
+    future.syncUninterruptibly();
+}
+----
