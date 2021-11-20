@@ -15,6 +15,8 @@
  */
 package io.netty.handler.codec.string;
 
+import static java.util.Objects.requireNonNull;
+
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandler.Sharable;
 import io.netty.channel.ChannelHandlerContext;
@@ -23,10 +25,8 @@ import io.netty.handler.codec.ByteToMessageDecoder;
 import io.netty.handler.codec.DelimiterBasedFrameDecoder;
 import io.netty.handler.codec.LineBasedFrameDecoder;
 import io.netty.handler.codec.MessageToMessageDecoder;
-import io.netty.util.internal.ObjectUtil;
 
 import java.nio.charset.Charset;
-import java.util.List;
 
 /**
  * Decodes a received {@link ByteBuf} into a {@link String}.  Please
@@ -69,11 +69,12 @@ public class StringDecoder extends MessageToMessageDecoder<ByteBuf> {
      * Creates a new instance with the specified character set.
      */
     public StringDecoder(Charset charset) {
-        this.charset = ObjectUtil.checkNotNull(charset, "charset");
+        requireNonNull(charset, "charset");
+        this.charset = charset;
     }
 
     @Override
-    protected void decode(ChannelHandlerContext ctx, ByteBuf msg, List<Object> out) throws Exception {
-        out.add(msg.toString(charset));
+    protected void decode(ChannelHandlerContext ctx, ByteBuf msg) throws Exception {
+        ctx.fireChannelRead(msg.toString(charset));
     }
 }

@@ -17,21 +17,17 @@ package io.netty.channel.nio;
 
 import io.netty.channel.AbstractEventLoopTest;
 import io.netty.channel.Channel;
-import io.netty.channel.DefaultSelectStrategyFactory;
 import io.netty.channel.EventLoop;
 import io.netty.channel.EventLoopGroup;
-import io.netty.channel.EventLoopTaskQueueFactory;
+import io.netty.channel.MultithreadEventLoopGroup;
 import io.netty.channel.SelectStrategy;
 import io.netty.channel.SelectStrategyFactory;
 import io.netty.channel.SingleThreadEventLoop;
 import io.netty.channel.socket.ServerSocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.util.IntSupplier;
-import io.netty.util.concurrent.DefaultEventExecutorChooserFactory;
 import io.netty.util.concurrent.DefaultThreadFactory;
 import io.netty.util.concurrent.Future;
-import io.netty.util.concurrent.RejectedExecutionHandlers;
-import io.netty.util.concurrent.ThreadPerTaskExecutor;
 import org.hamcrest.core.IsInstanceOf;
 import org.junit.Test;
 
@@ -41,13 +37,9 @@ import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.SocketChannel;
 import java.nio.channels.spi.SelectorProvider;
-import java.util.Queue;
-import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.Assert.*;
@@ -56,7 +48,7 @@ public class NioEventLoopTest extends AbstractEventLoopTest {
 
     @Override
     protected EventLoopGroup newEventLoopGroup() {
-        return new NioEventLoopGroup();
+        return new MultithreadEventLoopGroup(NioHandler.newFactory());
     }
 
     @Override
@@ -66,45 +58,38 @@ public class NioEventLoopTest extends AbstractEventLoopTest {
 
     @Test
     public void testRebuildSelector() {
-        EventLoopGroup group = new NioEventLoopGroup(1);
-        final NioEventLoop loop = (NioEventLoop) group.next();
+        final NioHandler nioHandler = (NioHandler) NioHandler.newFactory().newHandler();
+        EventLoop loop = new SingleThreadEventLoop(new DefaultThreadFactory("ioPool"), nioHandler);
         try {
-            Channel channel = new NioServerSocketChannel();
-            loop.register(channel).syncUninterruptibly();
+            Channel channel = new NioServerSocketChannel(loop, loop);
+            channel.register().syncUninterruptibly();
 
-            Selector selector = loop.unwrappedSelector();
-            assertSame(selector, ((NioEventLoop) channel.eventLoop()).unwrappedSelector());
+            Selector selector = loop.submit(nioHandler::unwrappedSelector).syncUninterruptibly().getNow();
+
+            assertSame(selector, loop.submit(nioHandler::unwrappedSelector).syncUninterruptibly().getNow());
             assertTrue(selector.isOpen());
 
             // Submit to the EventLoop so we are sure its really executed in a non-async manner.
-            loop.submit(new Runnable() {
-                @Override
-                public void run() {
-                    loop.rebuildSelector();
-                }
-            }).syncUninterruptibly();
+            loop.submit(nioHandler::rebuildSelector).syncUninterruptibly();
 
-            Selector newSelector = ((NioEventLoop) channel.eventLoop()).unwrappedSelector();
+            Selector newSelector = loop.submit(nioHandler::unwrappedSelector).syncUninterruptibly().getNow();
             assertTrue(newSelector.isOpen());
             assertNotSame(selector, newSelector);
             assertFalse(selector.isOpen());
 
             channel.close().syncUninterruptibly();
         } finally {
-            group.shutdownGracefully();
+            loop.shutdownGracefully();
         }
     }
 
     @Test
     public void testScheduleBigDelayNotOverflow() {
-        EventLoopGroup group = new NioEventLoopGroup(1);
+        EventLoopGroup group = new MultithreadEventLoopGroup(1, NioHandler.newFactory());
 
         final EventLoop el = group.next();
-        Future<?> future = el.schedule(new Runnable() {
-            @Override
-            public void run() {
-                // NOOP
-            }
+        Future<?> future = el.schedule(() -> {
+            // NOOP
         }, Long.MAX_VALUE, TimeUnit.MILLISECONDS);
 
         assertFalse(future.awaitUninterruptibly(1000));
@@ -114,108 +99,89 @@ public class NioEventLoopTest extends AbstractEventLoopTest {
 
     @Test
     public void testInterruptEventLoopThread() throws Exception {
-        EventLoopGroup group = new NioEventLoopGroup(1);
-        final NioEventLoop loop = (NioEventLoop) group.next();
+        final NioHandler nioHandler = (NioHandler) NioHandler.newFactory().newHandler();
+        EventLoop loop = new SingleThreadEventLoop(new DefaultThreadFactory("ioPool"), nioHandler);
         try {
-            Selector selector = loop.unwrappedSelector();
+            Selector selector = loop.submit(nioHandler::unwrappedSelector).syncUninterruptibly().getNow();
             assertTrue(selector.isOpen());
 
-            loop.submit(new Runnable() {
-                @Override
-                public void run() {
-                    // Interrupt the thread which should not end-up in a busy spin and
-                    // so the selector should not have been rebuild.
-                    Thread.currentThread().interrupt();
-                }
+            loop.submit(() -> {
+                // Interrupt the thread which should not end-up in a busy spin and
+                // so the selector should not have been rebuild.
+                Thread.currentThread().interrupt();
             }).syncUninterruptibly();
 
             assertTrue(selector.isOpen());
 
             final CountDownLatch latch = new CountDownLatch(2);
-            loop.submit(new Runnable() {
-                @Override
-                public void run() {
-                    latch.countDown();
-                }
-            }).syncUninterruptibly();
+            loop.submit(latch::countDown).syncUninterruptibly();
 
-            loop.schedule(new Runnable() {
-                @Override
-                public void run() {
-                    latch.countDown();
-                }
-            }, 2, TimeUnit.SECONDS).syncUninterruptibly();
+            loop.schedule(latch::countDown, 2, TimeUnit.SECONDS).syncUninterruptibly();
 
             latch.await();
 
-            assertSame(selector, loop.unwrappedSelector());
+            assertSame(selector, loop.submit(nioHandler::unwrappedSelector).syncUninterruptibly().getNow());
             assertTrue(selector.isOpen());
         } finally {
-            group.shutdownGracefully();
+            loop.shutdownGracefully();
         }
     }
 
     @Test(timeout = 3000)
     public void testSelectableChannel() throws Exception {
-        NioEventLoopGroup group = new NioEventLoopGroup(1);
-        NioEventLoop loop = (NioEventLoop) group.next();
-
+        final NioHandler nioHandler = (NioHandler) NioHandler.newFactory().newHandler();
+        EventLoop loop = new SingleThreadEventLoop(new DefaultThreadFactory("ioPool"), nioHandler);
         try {
-            Channel channel = new NioServerSocketChannel();
-            loop.register(channel).syncUninterruptibly();
+            Channel channel = new NioServerSocketChannel(loop, loop);
+            channel.register().syncUninterruptibly();
             channel.bind(new InetSocketAddress(0)).syncUninterruptibly();
 
-            SocketChannel selectableChannel = SocketChannel.open();
+            final SocketChannel selectableChannel = SocketChannel.open();
             selectableChannel.configureBlocking(false);
             selectableChannel.connect(channel.localAddress());
 
             final CountDownLatch latch = new CountDownLatch(1);
 
-            loop.register(selectableChannel, SelectionKey.OP_CONNECT, new NioTask<SocketChannel>() {
-                @Override
-                public void channelReady(SocketChannel ch, SelectionKey key) {
-                    latch.countDown();
-                }
+            loop.execute(() ->
+                    nioHandler.register(selectableChannel, SelectionKey.OP_CONNECT, new NioTask<SocketChannel>() {
+                        @Override
+                        public void channelReady(SocketChannel ch, SelectionKey key) {
+                            latch.countDown();
+                        }
 
-                @Override
-                public void channelUnregistered(SocketChannel ch, Throwable cause) {
-                }
-            });
+                        @Override
+                        public void channelUnregistered(SocketChannel ch, Throwable cause) {
+                        }
+                    }));
 
             latch.await();
 
             selectableChannel.close();
             channel.close().syncUninterruptibly();
         } finally {
-            group.shutdownGracefully();
+            loop.shutdownGracefully();
         }
     }
 
     @SuppressWarnings("deprecation")
     @Test
     public void testTaskRemovalOnShutdownThrowsNoUnsupportedOperationException() throws Exception {
-        final AtomicReference<Throwable> error = new AtomicReference<Throwable>();
-        final Runnable task = new Runnable() {
-            @Override
-            public void run() {
-                // NOOP
-            }
+        final AtomicReference<Throwable> error = new AtomicReference<>();
+        final Runnable task = () -> {
+            // NOOP
         };
         // Just run often enough to trigger it normally.
         for (int i = 0; i < 1000; i++) {
-            NioEventLoopGroup group = new NioEventLoopGroup(1);
-            final NioEventLoop loop = (NioEventLoop) group.next();
+            EventLoopGroup group = new MultithreadEventLoopGroup(1, NioHandler.newFactory());
+            final EventLoop loop = group.next();
 
-            Thread t = new Thread(new Runnable() {
-                @Override
-                public void run() {
-                    try {
-                        for (;;) {
-                            loop.execute(task);
-                        }
-                    } catch (Throwable cause) {
-                        error.set(cause);
+            Thread t = new Thread(() -> {
+                try {
+                    for (;;) {
+                        loop.execute(task);
                     }
+                } catch (Throwable cause) {
+                    error.set(cause);
                 }
             });
             t.start();
@@ -228,112 +194,46 @@ public class NioEventLoopTest extends AbstractEventLoopTest {
     }
 
     @Test
-    public void testRebuildSelectorOnIOException() {
-        SelectStrategyFactory selectStrategyFactory = new SelectStrategyFactory() {
+    public void testRebuildSelectorOnIOException() throws InterruptedException {
+        final CountDownLatch latch = new CountDownLatch(1);
+        final CountDownLatch strategyLatch = new CountDownLatch(1);
+        SelectStrategyFactory selectStrategyFactory = () -> new SelectStrategy() {
+
+            private boolean thrown;
+
             @Override
-            public SelectStrategy newSelectStrategy() {
-                return new SelectStrategy() {
-
-                    private boolean thrown;
-
-                    @Override
-                    public int calculateStrategy(IntSupplier selectSupplier, boolean hasTasks) throws Exception {
-                        if (!thrown) {
-                            thrown = true;
-                            throw new IOException();
-                        }
-                        return -1;
-                    }
-                };
+            public int calculateStrategy(IntSupplier selectSupplier, boolean hasTasks) throws Exception {
+                strategyLatch.await();
+                if (!thrown) {
+                    thrown = true;
+                    throw new IOException();
+                }
+                latch.countDown();
+                return -1;
             }
         };
 
-        EventLoopGroup group = new NioEventLoopGroup(1, new DefaultThreadFactory("ioPool"),
-                                                     SelectorProvider.provider(), selectStrategyFactory);
-        final NioEventLoop loop = (NioEventLoop) group.next();
+        final NioHandler nioHandler = (NioHandler) NioHandler.newFactory(SelectorProvider.provider(),
+                selectStrategyFactory).newHandler();
+
+        EventLoop loop = new SingleThreadEventLoop(new DefaultThreadFactory("ioPool"), nioHandler);
         try {
-            Channel channel = new NioServerSocketChannel();
-            Selector selector = loop.unwrappedSelector();
+            Channel channel = new NioServerSocketChannel(loop, loop);
+            Selector selector = nioHandler.unwrappedSelector();
+            strategyLatch.countDown();
 
-            loop.register(channel).syncUninterruptibly();
+            channel.register().syncUninterruptibly();
 
-            Selector newSelector = ((NioEventLoop) channel.eventLoop()).unwrappedSelector();
+            latch.await();
+
+            Selector newSelector = loop.submit(nioHandler::unwrappedSelector).syncUninterruptibly().getNow();
             assertTrue(newSelector.isOpen());
             assertNotSame(selector, newSelector);
             assertFalse(selector.isOpen());
 
             channel.close().syncUninterruptibly();
         } finally {
-            group.shutdownGracefully();
-        }
-    }
-
-    @Test(timeout = 3000L)
-    public void testChannelsRegistered() throws Exception {
-        NioEventLoopGroup group = new NioEventLoopGroup(1);
-        final NioEventLoop loop = (NioEventLoop) group.next();
-
-        try {
-            final Channel ch1 = new NioServerSocketChannel();
-            final Channel ch2 = new NioServerSocketChannel();
-
-            assertEquals(0, registeredChannels(loop));
-
-            assertTrue(loop.register(ch1).syncUninterruptibly().isSuccess());
-            assertTrue(loop.register(ch2).syncUninterruptibly().isSuccess());
-            assertEquals(2, registeredChannels(loop));
-
-            assertTrue(ch1.deregister().syncUninterruptibly().isSuccess());
-
-            int registered;
-            // As SelectionKeys are removed in a lazy fashion in the JDK implementation we may need to query a few
-            // times before we see the right number of registered chanels.
-            while ((registered = registeredChannels(loop)) == 2) {
-                Thread.sleep(50);
-            }
-            assertEquals(1, registered);
-        } finally {
-            group.shutdownGracefully();
-        }
-    }
-
-    // Only reliable if run from event loop
-    private static int registeredChannels(final SingleThreadEventLoop loop) throws Exception {
-        return loop.submit(new Callable<Integer>() {
-            @Override
-            public Integer call() {
-                return loop.registeredChannels();
-            }
-        }).get(1, TimeUnit.SECONDS);
-    }
-
-    @Test
-    public void testCustomQueue()  {
-        final AtomicBoolean called = new AtomicBoolean();
-        NioEventLoopGroup group = new NioEventLoopGroup(1,
-                new ThreadPerTaskExecutor(new DefaultThreadFactory(NioEventLoopGroup.class)),
-                DefaultEventExecutorChooserFactory.INSTANCE, SelectorProvider.provider(),
-                DefaultSelectStrategyFactory.INSTANCE, RejectedExecutionHandlers.reject(),
-                new EventLoopTaskQueueFactory() {
-                    @Override
-                    public Queue<Runnable> newTaskQueue(int maxCapacity) {
-                        called.set(true);
-                        return new LinkedBlockingQueue<Runnable>(maxCapacity);
-                    }
-        });
-
-        final NioEventLoop loop = (NioEventLoop) group.next();
-
-        try {
-            loop.submit(new Runnable() {
-                @Override
-                public void run() {
-                    // NOOP.
-                }
-            }).syncUninterruptibly();
-            assertTrue(called.get());
-        } finally {
-            group.shutdownGracefully();
+            loop.shutdownGracefully();
         }
     }
 

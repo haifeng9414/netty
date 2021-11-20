@@ -183,15 +183,6 @@ import java.nio.charset.UnsupportedCharsetException;
  * For complicated searches, use {@link #forEachByte(int, int, ByteProcessor)} with a {@link ByteProcessor}
  * implementation.
  *
- * <h3>Mark and reset</h3>
- *
- * There are two marker indexes in every buffer. One is for storing
- * {@link #readerIndex() readerIndex} and the other is for storing
- * {@link #writerIndex() writerIndex}.  You can always reposition one of the
- * two indexes by calling a reset method.  It works in a similar fashion to
- * the mark and reset methods in {@link InputStream} except that there's no
- * {@code readlimit}.
- *
  * <h3>Derived buffers</h3>
  *
  * You can create a view of an existing buffer by calling one of the following methods:
@@ -206,7 +197,7 @@ import java.nio.charset.UnsupportedCharsetException;
  *   <li>{@link #readRetainedSlice(int)}</li>
  * </ul>
  * A derived buffer will have an independent {@link #readerIndex() readerIndex},
- * {@link #writerIndex() writerIndex} and marker indexes, while it shares
+ * {@link #writerIndex() writerIndex}, while it shares
  * other internal data representation, just like a NIO buffer does.
  * <p>
  * In case a completely fresh copy of an existing buffer is required, please
@@ -285,8 +276,8 @@ public abstract class ByteBuf implements ReferenceCounted, Comparable<ByteBuf> {
 
     /**
      * Returns a buffer with the specified {@code endianness} which shares the whole region,
-     * indexes, and marks of this buffer.  Modifying the content, the indexes, or the marks of the
-     * returned buffer or this buffer affects each other's content, indexes, and marks.  If the
+     * indexes of this buffer.  Modifying the content, the indexes of the
+     * returned buffer or this buffer affects each other's content, and indexes. If the
      * specified {@code endianness} is identical to this buffer's byte order, this method can
      * return {@code this}.  This method does not modify {@code readerIndex} or {@code writerIndex}
      * of this buffer.
@@ -465,42 +456,6 @@ public abstract class ByteBuf implements ReferenceCounted, Comparable<ByteBuf> {
      * the {@code capacity} of the buffer.
      */
     public abstract ByteBuf clear();
-
-    /**
-     * Marks the current {@code readerIndex} in this buffer.  You can
-     * reposition the current {@code readerIndex} to the marked
-     * {@code readerIndex} by calling {@link #resetReaderIndex()}.
-     * The initial value of the marked {@code readerIndex} is {@code 0}.
-     */
-    public abstract ByteBuf markReaderIndex();
-
-    /**
-     * Repositions the current {@code readerIndex} to the marked
-     * {@code readerIndex} in this buffer.
-     *
-     * @throws IndexOutOfBoundsException
-     *         if the current {@code writerIndex} is less than the marked
-     *         {@code readerIndex}
-     */
-    public abstract ByteBuf resetReaderIndex();
-
-    /**
-     * Marks the current {@code writerIndex} in this buffer.  You can
-     * reposition the current {@code writerIndex} to the marked
-     * {@code writerIndex} by calling {@link #resetWriterIndex()}.
-     * The initial value of the marked {@code writerIndex} is {@code 0}.
-     */
-    public abstract ByteBuf markWriterIndex();
-
-    /**
-     * Repositions the current {@code writerIndex} to the marked
-     * {@code writerIndex} in this buffer.
-     *
-     * @throws IndexOutOfBoundsException
-     *         if the current {@code readerIndex} is greater than the marked
-     *         {@code writerIndex}
-     */
-    public abstract ByteBuf resetWriterIndex();
 
     /**
      * Discards the bytes between the 0th index and {@code readerIndex}.
@@ -2177,7 +2132,7 @@ public abstract class ByteBuf implements ReferenceCounted, Comparable<ByteBuf> {
     /**
      * Returns a slice of this buffer's readable bytes. Modifying the content
      * of the returned buffer or this buffer affects each other's content
-     * while they maintain separate indexes and marks.  This method is
+     * while they maintain separate indexes.  This method is
      * identical to {@code buf.slice(buf.readerIndex(), buf.readableBytes())}.
      * This method does not modify {@code readerIndex} or {@code writerIndex} of
      * this buffer.
@@ -2190,7 +2145,7 @@ public abstract class ByteBuf implements ReferenceCounted, Comparable<ByteBuf> {
     /**
      * Returns a retained slice of this buffer's readable bytes. Modifying the content
      * of the returned buffer or this buffer affects each other's content
-     * while they maintain separate indexes and marks.  This method is
+     * while they maintain separate indexes.  This method is
      * identical to {@code buf.slice(buf.readerIndex(), buf.readableBytes())}.
      * This method does not modify {@code readerIndex} or {@code writerIndex} of
      * this buffer.
@@ -2204,7 +2159,7 @@ public abstract class ByteBuf implements ReferenceCounted, Comparable<ByteBuf> {
     /**
      * Returns a slice of this buffer's sub-region. Modifying the content of
      * the returned buffer or this buffer affects each other's content while
-     * they maintain separate indexes and marks.
+     * they maintain separate indexes.
      * This method does not modify {@code readerIndex} or {@code writerIndex} of
      * this buffer.
      * <p>
@@ -2216,7 +2171,7 @@ public abstract class ByteBuf implements ReferenceCounted, Comparable<ByteBuf> {
     /**
      * Returns a retained slice of this buffer's sub-region. Modifying the content of
      * the returned buffer or this buffer affects each other's content while
-     * they maintain separate indexes and marks.
+     * they maintain separate indexes.
      * This method does not modify {@code readerIndex} or {@code writerIndex} of
      * this buffer.
      * <p>
@@ -2229,11 +2184,11 @@ public abstract class ByteBuf implements ReferenceCounted, Comparable<ByteBuf> {
     /**
      * Returns a buffer which shares the whole region of this buffer.
      * Modifying the content of the returned buffer or this buffer affects
-     * each other's content while they maintain separate indexes and marks.
+     * each other's content while they maintain separate indexes.
      * This method does not modify {@code readerIndex} or {@code writerIndex} of
      * this buffer.
      * <p>
-     * The reader and writer marks will not be duplicated. Also be aware that this method will
+     * Be aware that this method will
      * NOT call {@link #retain()} and so the reference count will NOT be increased.
      * @return A buffer whose readable content is equivalent to the buffer returned by {@link #slice()}.
      * However this buffer will share the capacity of the underlying buffer, and therefore allows access to all of the
@@ -2244,7 +2199,7 @@ public abstract class ByteBuf implements ReferenceCounted, Comparable<ByteBuf> {
     /**
      * Returns a retained buffer which shares the whole region of this buffer.
      * Modifying the content of the returned buffer or this buffer affects
-     * each other's content while they maintain separate indexes and marks.
+     * each other's content while they maintain separate indexes.
      * This method is identical to {@code buf.slice(0, buf.capacity())}.
      * This method does not modify {@code readerIndex} or {@code writerIndex} of
      * this buffer.
@@ -2273,7 +2228,7 @@ public abstract class ByteBuf implements ReferenceCounted, Comparable<ByteBuf> {
     /**
      * Exposes this buffer's readable bytes as an NIO {@link ByteBuffer}. The returned buffer
      * either share or contains the copied content of this buffer, while changing the position
-     * and limit of the returned NIO buffer does not affect the indexes and marks of this buffer.
+     * and limit of the returned NIO buffer does not affect the indexes of this buffer.
      * This method is identical to {@code buf.nioBuffer(buf.readerIndex(), buf.readableBytes())}.
      * This method does not modify {@code readerIndex} or {@code writerIndex} of this buffer.
      * Please note that the returned NIO buffer will not see the changes of this buffer if this buffer
@@ -2291,7 +2246,7 @@ public abstract class ByteBuf implements ReferenceCounted, Comparable<ByteBuf> {
     /**
      * Exposes this buffer's sub-region as an NIO {@link ByteBuffer}. The returned buffer
      * either share or contains the copied content of this buffer, while changing the position
-     * and limit of the returned NIO buffer does not affect the indexes and marks of this buffer.
+     * and limit of the returned NIO buffer does not affect the indexes of this buffer.
      * This method does not modify {@code readerIndex} or {@code writerIndex} of this buffer.
      * Please note that the returned NIO buffer will not see the changes of this buffer if this buffer
      * is a dynamic buffer and it adjusted its capacity.
@@ -2313,7 +2268,7 @@ public abstract class ByteBuf implements ReferenceCounted, Comparable<ByteBuf> {
     /**
      * Exposes this buffer's readable bytes as an NIO {@link ByteBuffer}'s. The returned buffer
      * either share or contains the copied content of this buffer, while changing the position
-     * and limit of the returned NIO buffer does not affect the indexes and marks of this buffer.
+     * and limit of the returned NIO buffer does not affect the indexes of this buffer.
      * This method does not modify {@code readerIndex} or {@code writerIndex} of this buffer.
      * Please note that the returned NIO buffer will not see the changes of this buffer if this buffer
      * is a dynamic buffer and it adjusted its capacity.
@@ -2331,7 +2286,7 @@ public abstract class ByteBuf implements ReferenceCounted, Comparable<ByteBuf> {
     /**
      * Exposes this buffer's bytes as an NIO {@link ByteBuffer}'s for the specified index and length
      * The returned buffer either share or contains the copied content of this buffer, while changing
-     * the position and limit of the returned NIO buffer does not affect the indexes and marks of this buffer.
+     * the position and limit of the returned NIO buffer does not affect the indexes of this buffer.
      * This method does not modify {@code readerIndex} or {@code writerIndex} of this buffer. Please note that the
      * returned NIO buffer will not see the changes of this buffer if this buffer is a dynamic
      * buffer and it adjusted its capacity.

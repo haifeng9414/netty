@@ -251,31 +251,38 @@ public class HttpObjectAggregator
             if (oversized instanceof FullHttpMessage ||
                 !HttpUtil.is100ContinueExpected(oversized) && !HttpUtil.isKeepAlive(oversized)) {
                 ChannelFuture future = ctx.writeAndFlush(TOO_LARGE_CLOSE.retainedDuplicate());
-                future.addListener(new ChannelFutureListener() {
-                    @Override
-                    public void operationComplete(ChannelFuture future) throws Exception {
-                        if (!future.isSuccess()) {
-                            logger.debug("Failed to send a 413 Request Entity Too Large.", future.cause());
-                        }
-                        ctx.close();
+                future.addListener((ChannelFutureListener) future1 -> {
+                    if (!future1.isSuccess()) {
+                        logger.debug("Failed to send a 413 Request Entity Too Large.", future1.cause());
                     }
+                    ctx.close();
                 });
             } else {
-                ctx.writeAndFlush(TOO_LARGE.retainedDuplicate()).addListener(new ChannelFutureListener() {
-                    @Override
-                    public void operationComplete(ChannelFuture future) throws Exception {
-                        if (!future.isSuccess()) {
-                            logger.debug("Failed to send a 413 Request Entity Too Large.", future.cause());
-                            ctx.close();
-                        }
+                ctx.writeAndFlush(TOO_LARGE.retainedDuplicate()).addListener((ChannelFutureListener) future -> {
+                    if (!future.isSuccess()) {
+                        logger.debug("Failed to send a 413 Request Entity Too Large.", future.cause());
+                        ctx.close();
                     }
                 });
             }
         } else if (oversized instanceof HttpResponse) {
-            ctx.close();
-            throw new TooLongFrameException("Response entity too large: " + oversized);
+            throw new ResponseTooLargeException("Response entity too large: " + oversized);
         } else {
             throw new IllegalStateException();
+        }
+    }
+
+    @Override
+    public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
+        super.exceptionCaught(ctx, cause);
+        if (cause instanceof ResponseTooLargeException) {
+            ctx.close();
+        }
+    }
+
+    private static final class ResponseTooLargeException extends TooLongFrameException {
+        ResponseTooLargeException(String message) {
+            super(message);
         }
     }
 

@@ -15,7 +15,8 @@
  */
 package io.netty.util.internal.logging;
 
-import io.netty.util.internal.ObjectUtil;
+import static java.util.Objects.requireNonNull;
+
 import io.netty.util.internal.StringUtil;
 
 import java.io.ObjectStreamException;
@@ -38,7 +39,8 @@ public abstract class AbstractInternalLogger implements InternalLogger, Serializ
      * Creates a new instance.
      */
     protected AbstractInternalLogger(String name) {
-        this.name = ObjectUtil.checkNotNull(name, "name");
+        requireNonNull(name, "name");
+        this.name = name;
     }
 
     @Override

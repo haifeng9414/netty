@@ -19,15 +19,16 @@ import io.netty.bootstrap.Bootstrap;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
+import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
-import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelPromise;
-import io.netty.channel.DefaultEventLoopGroup;
 import io.netty.channel.EventLoopGroup;
+import io.netty.channel.MultithreadEventLoopGroup;
 import io.netty.channel.embedded.EmbeddedChannel;
 import io.netty.channel.local.LocalAddress;
 import io.netty.channel.local.LocalChannel;
+import io.netty.channel.local.LocalHandler;
 import io.netty.channel.local.LocalServerChannel;
 import io.netty.handler.codec.http.DefaultFullHttpResponse;
 import io.netty.handler.codec.http.DefaultHttpHeaders;
@@ -178,7 +179,7 @@ public class HttpProxyHandlerTest {
         Channel serverChannel = null;
         Channel clientChannel = null;
         try {
-            group = new DefaultEventLoopGroup(1);
+            group = new MultithreadEventLoopGroup(1, LocalHandler.newFactory());
             final LocalAddress addr = new LocalAddress("a");
             final AtomicReference<Throwable> exception = new AtomicReference<Throwable>();
             ChannelFuture sf =
@@ -188,12 +189,17 @@ public class HttpProxyHandlerTest {
                         @Override
                         protected void initChannel(Channel ch) {
                             ch.pipeline().addFirst(new HttpResponseEncoder());
-                            DefaultFullHttpResponse response = new DefaultFullHttpResponse(
-                                HttpVersion.HTTP_1_1,
-                                HttpResponseStatus.BAD_GATEWAY);
-                            response.headers().add("name", "value");
-                            response.headers().add(HttpHeaderNames.CONTENT_LENGTH, "0");
-                            ch.writeAndFlush(response);
+                            ch.pipeline().addFirst(new ChannelHandler() {
+                                @Override
+                                public void channelActive(ChannelHandlerContext ctx) {
+                                    DefaultFullHttpResponse response = new DefaultFullHttpResponse(
+                                            HttpVersion.HTTP_1_1,
+                                            HttpResponseStatus.BAD_GATEWAY);
+                                    response.headers().add("name", "value");
+                                    response.headers().add(HttpHeaderNames.CONTENT_LENGTH, "0");
+                                    ctx.writeAndFlush(response);
+                                }
+                            });
                         }
                     }).bind(addr);
             serverChannel = sf.sync().channel();
@@ -202,7 +208,7 @@ public class HttpProxyHandlerTest {
                     @Override
                     protected void initChannel(Channel ch) {
                         ch.pipeline().addFirst(new HttpProxyHandler(addr));
-                        ch.pipeline().addLast(new ChannelInboundHandlerAdapter() {
+                        ch.pipeline().addLast(new ChannelHandler() {
                             @Override
                             public void exceptionCaught(ChannelHandlerContext ctx,
                                 Throwable cause) {

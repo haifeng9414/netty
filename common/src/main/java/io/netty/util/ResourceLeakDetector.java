@@ -17,21 +17,19 @@
 package io.netty.util;
 
 import io.netty.util.internal.EmptyArrays;
-import io.netty.util.internal.ObjectUtil;
-import io.netty.util.internal.PlatformDependent;
 import io.netty.util.internal.SystemPropertyUtil;
 import io.netty.util.internal.logging.InternalLogger;
 import io.netty.util.internal.logging.InternalLoggerFactory;
 
-import java.lang.ref.WeakReference;
 import java.lang.ref.ReferenceQueue;
+import java.lang.ref.WeakReference;
 import java.lang.reflect.Method;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicIntegerFieldUpdater;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.atomic.AtomicReferenceFieldUpdater;
@@ -39,10 +37,10 @@ import java.util.concurrent.atomic.AtomicReferenceFieldUpdater;
 import static io.netty.util.internal.StringUtil.EMPTY_STRING;
 import static io.netty.util.internal.StringUtil.NEWLINE;
 import static io.netty.util.internal.StringUtil.simpleClassName;
+import static java.util.Objects.requireNonNull;
 
 public class ResourceLeakDetector<T> {
 
-    private static final String PROP_LEVEL_OLD = "io.netty.leakDetectionLevel";
     private static final String PROP_LEVEL = "io.netty.leakDetection.level";
     private static final Level DEFAULT_LEVEL = Level.SIMPLE;
 
@@ -102,24 +100,7 @@ public class ResourceLeakDetector<T> {
     private static final InternalLogger logger = InternalLoggerFactory.getInstance(ResourceLeakDetector.class);
 
     static {
-        final boolean disabled;
-        if (SystemPropertyUtil.get("io.netty.noResourceLeakDetection") != null) {
-            disabled = SystemPropertyUtil.getBoolean("io.netty.noResourceLeakDetection", false);
-            logger.debug("-Dio.netty.noResourceLeakDetection: {}", disabled);
-            logger.warn(
-                    "-Dio.netty.noResourceLeakDetection is deprecated. Use '-D{}={}' instead.",
-                    PROP_LEVEL, DEFAULT_LEVEL.name().toLowerCase());
-        } else {
-            disabled = false;
-        }
-
-        Level defaultLevel = disabled? Level.DISABLED : DEFAULT_LEVEL;
-
-        // First read old property name
-        String levelStr = SystemPropertyUtil.get(PROP_LEVEL_OLD, defaultLevel.name());
-
-        // If new property name is present, use it
-        levelStr = SystemPropertyUtil.get(PROP_LEVEL, levelStr);
+        String levelStr = SystemPropertyUtil.get(PROP_LEVEL, DEFAULT_LEVEL.name());
         Level level = Level.parseLevel(levelStr);
 
         TARGET_RECORDS = SystemPropertyUtil.getInt(PROP_TARGET_RECORDS, DEFAULT_TARGET_RECORDS);
@@ -151,7 +132,8 @@ public class ResourceLeakDetector<T> {
      * Sets the resource leak detection level.
      */
     public static void setLevel(Level level) {
-        ResourceLeakDetector.level = ObjectUtil.checkNotNull(level, "level");
+        requireNonNull(level, "level");
+        ResourceLeakDetector.level = level;
     }
 
     /**
@@ -162,13 +144,11 @@ public class ResourceLeakDetector<T> {
     }
 
     /** the collection of active resources */
-    private final Set<DefaultResourceLeak<?>> allLeaks =
-            Collections.newSetFromMap(new ConcurrentHashMap<DefaultResourceLeak<?>, Boolean>());
+    private final Set<DefaultResourceLeak<?>> allLeaks = ConcurrentHashMap.newKeySet();
 
-    private final ReferenceQueue<Object> refQueue = new ReferenceQueue<Object>();
+    private final ReferenceQueue<Object> refQueue = new ReferenceQueue<>();
     private final Set<String> reportedLeaks =
-            Collections.newSetFromMap(new ConcurrentHashMap<String, Boolean>());
-
+            Collections.newSetFromMap(new ConcurrentHashMap<>());
     private final String resourceType;
     private final int samplingInterval;
 
@@ -219,7 +199,9 @@ public class ResourceLeakDetector<T> {
      */
     @Deprecated
     public ResourceLeakDetector(String resourceType, int samplingInterval, long maxActive) {
-        this.resourceType = ObjectUtil.checkNotNull(resourceType, "resourceType");
+        requireNonNull(resourceType, "resourceType");
+
+        this.resourceType = resourceType;
         this.samplingInterval = samplingInterval;
     }
 
@@ -254,7 +236,7 @@ public class ResourceLeakDetector<T> {
         }
 
         if (level.ordinal() < Level.PARANOID.ordinal()) {
-            if ((PlatformDependent.threadLocalRandom().nextInt(samplingInterval)) == 0) {
+            if (ThreadLocalRandom.current().nextInt(samplingInterval) == 0) {
                 reportLeak();
                 return new DefaultResourceLeak(obj, refQueue, allLeaks);
             }
@@ -434,7 +416,7 @@ public class ResourceLeakDetector<T> {
                     final int numElements = oldHead.pos + 1;
                     if (numElements >= TARGET_RECORDS) {
                         final int backOffFactor = Math.min(numElements - TARGET_RECORDS, 30);
-                        if (dropped = PlatformDependent.threadLocalRandom().nextInt(1 << backOffFactor) != 0) {
+                        if (dropped = ThreadLocalRandom.current().nextInt(1 << backOffFactor) != 0) {
                             prevHead = oldHead.next;
                         }
                     } else {
@@ -524,7 +506,7 @@ public class ResourceLeakDetector<T> {
             buf.append("Recent access records: ").append(NEWLINE);
 
             int i = 1;
-            Set<String> seen = new HashSet<String>(present);
+            Set<String> seen = new HashSet<>(present);
             for (; oldHead != TraceRecord.BOTTOM; oldHead = oldHead.next) {
                 String s = oldHead.toString();
                 if (seen.add(s)) {
@@ -562,10 +544,10 @@ public class ResourceLeakDetector<T> {
     }
 
     private static final AtomicReference<String[]> excludedMethods =
-            new AtomicReference<String[]>(EmptyArrays.EMPTY_STRINGS);
+            new AtomicReference<>(EmptyArrays.EMPTY_STRINGS);
 
     public static void addExclusions(Class clz, String ... methodNames) {
-        Set<String> nameSet = new HashSet<String>(Arrays.asList(methodNames));
+        Set<String> nameSet = new HashSet<>(Arrays.asList(methodNames));
         // Use loop rather than lookup. This avoids knowing the parameters, and doesn't have to handle
         // NoSuchMethodException.
         for (Method method : clz.getDeclaredMethods()) {

@@ -21,10 +21,11 @@ import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInitializer;
-import io.netty.channel.DefaultEventLoop;
 import io.netty.channel.EventLoopGroup;
+import io.netty.channel.MultithreadEventLoopGroup;
 import io.netty.channel.local.LocalAddress;
 import io.netty.channel.local.LocalChannel;
+import io.netty.channel.local.LocalHandler;
 import io.netty.channel.local.LocalServerChannel;
 import io.netty.util.concurrent.DefaultPromise;
 import io.netty.util.concurrent.EventExecutor;
@@ -67,7 +68,7 @@ public class Http2StreamChannelBootstrapTest {
         Channel clientChannel = null;
         try {
             final CountDownLatch serverChannelLatch = new CountDownLatch(1);
-            group = new DefaultEventLoop();
+            group = new MultithreadEventLoopGroup(LocalHandler.newFactory());
             LocalAddress serverAddress = new LocalAddress(getClass().getName());
             ServerBootstrap sb = new ServerBootstrap()
                     .channel(LocalServerChannel.class)
@@ -94,28 +95,13 @@ public class Http2StreamChannelBootstrapTest {
             clientChannel = cb.connect(serverAddress).sync().channel();
             assertTrue(serverChannelLatch.await(3, SECONDS));
 
-            final CountDownLatch closeLatch = new CountDownLatch(1);
-            final Channel clientChannelToClose = clientChannel;
-            group.execute(new Runnable() {
-                @Override
-                public void run() {
-                    try {
-                        closeLatch.await();
-                        clientChannelToClose.close().syncUninterruptibly();
-                    } catch (InterruptedException e) {
-                        logger.error(e);
-                    }
-                }
-            });
-
             Http2StreamChannelBootstrap bootstrap = new Http2StreamChannelBootstrap(clientChannel);
             Promise<Http2StreamChannel> promise = clientChannel.eventLoop().newPromise();
+            clientChannel.close().sync();
             bootstrap.open(promise);
-            assertThat(promise.isDone(), is(false));
-            closeLatch.countDown();
 
             exceptionRule.expect(ExecutionException.class);
-            exceptionRule.expectCause(IsInstanceOf.<Throwable>instanceOf(ClosedChannelException.class));
+            exceptionRule.expectCause(IsInstanceOf.instanceOf(ClosedChannelException.class));
             promise.get(3, SECONDS);
         } finally {
             safeClose(clientChannel);

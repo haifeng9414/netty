@@ -90,17 +90,11 @@ public class GlobalEventExecutorTest {
     @Test(timeout = 2000)
     public void testThreadGroup() throws InterruptedException {
         final ThreadGroup group = new ThreadGroup("group");
-        final AtomicReference<ThreadGroup> capturedGroup = new AtomicReference<ThreadGroup>();
-        final Thread thread = new Thread(group, new Runnable() {
-            @Override
-            public void run() {
-                final Thread t = e.threadFactory.newThread(new Runnable() {
-                    @Override
-                    public void run() {
-                    }
-                });
-                capturedGroup.set(t.getThreadGroup());
-            }
+        final AtomicReference<ThreadGroup> capturedGroup = new AtomicReference<>();
+        final Thread thread = new Thread(group, () -> {
+            final Thread t = e.threadFactory.newThread(() -> {
+            });
+            capturedGroup.set(t.getThreadGroup());
         });
         thread.start();
         thread.join();
@@ -136,23 +130,15 @@ public class GlobalEventExecutorTest {
         TestRunnable t = new TestRunnable(0);
         ScheduledFuture<?> f = e.schedule(t, 1500, TimeUnit.MILLISECONDS);
 
-        final Runnable doNothing = new Runnable() {
-            @Override
-            public void run() {
-                //NOOP
-            }
-        };
+        final Runnable doNothing = () -> { };
         final AtomicBoolean stop = new AtomicBoolean(false);
 
         //ensure always has at least one task in taskQueue
         //check if scheduled tasks are triggered
         try {
-            new Thread(new Runnable() {
-                @Override
-                public void run() {
-                    while (!stop.get()) {
-                        e.execute(doNothing);
-                    }
+            new Thread(() -> {
+                while (!stop.get()) {
+                    e.execute(doNothing);
                 }
             }).start();
 

@@ -15,16 +15,17 @@
  */
 package io.netty.channel;
 
-import io.netty.util.concurrent.AbstractFuture;
+import static java.util.Objects.requireNonNull;
+
+import io.netty.util.concurrent.EventExecutor;
 import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.GenericFutureListener;
-import io.netty.util.internal.ObjectUtil;
 import io.netty.util.internal.UnstableApi;
 
 import java.util.concurrent.TimeUnit;
 
 @UnstableApi
-public final class VoidChannelPromise extends AbstractFuture<Void> implements ChannelPromise {
+public final class VoidChannelPromise implements ChannelPromise {
 
     private final Channel channel;
     // Will be null if we should not propagate exceptions through the pipeline on failure case.
@@ -36,21 +37,23 @@ public final class VoidChannelPromise extends AbstractFuture<Void> implements Ch
      * @param channel the {@link Channel} associated with this future
      */
     public VoidChannelPromise(final Channel channel, boolean fireException) {
-        ObjectUtil.checkNotNull(channel, "channel");
+        requireNonNull(channel, "channel");
         this.channel = channel;
         if (fireException) {
-            fireExceptionListener = new ChannelFutureListener() {
-                @Override
-                public void operationComplete(ChannelFuture future) throws Exception {
-                    Throwable cause = future.cause();
-                    if (cause != null) {
-                        fireException0(cause);
-                    }
+            fireExceptionListener = future -> {
+                Throwable cause = future.cause();
+                if (cause != null) {
+                    fireException0(cause);
                 }
             };
         } else {
             fireExceptionListener = null;
         }
+    }
+
+    @Override
+    public EventExecutor executor() {
+        return channel.eventLoop();
     }
 
     @Override
@@ -161,7 +164,6 @@ public final class VoidChannelPromise extends AbstractFuture<Void> implements Ch
         fail();
         return this;
     }
-
     @Override
     public VoidChannelPromise setFailure(Throwable cause) {
         fireException0(cause);

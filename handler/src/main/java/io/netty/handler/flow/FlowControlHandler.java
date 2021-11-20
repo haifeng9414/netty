@@ -19,7 +19,6 @@ import java.util.ArrayDeque;
 import java.util.Queue;
 
 import io.netty.channel.ChannelConfig;
-import io.netty.channel.ChannelDuplexHandler;
 import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.ByteToMessageDecoder;
@@ -27,7 +26,6 @@ import io.netty.handler.codec.MessageToByteEncoder;
 import io.netty.util.ReferenceCountUtil;
 import io.netty.util.internal.ObjectPool;
 import io.netty.util.internal.ObjectPool.Handle;
-import io.netty.util.internal.ObjectPool.ObjectCreator;
 import io.netty.util.internal.logging.InternalLogger;
 import io.netty.util.internal.logging.InternalLoggerFactory;
 
@@ -65,7 +63,7 @@ import io.netty.util.internal.logging.InternalLoggerFactory;
  *
  * @see ChannelConfig#setAutoRead(boolean)
  */
-public class FlowControlHandler extends ChannelDuplexHandler {
+public class FlowControlHandler implements ChannelHandler {
     private static final InternalLogger logger = InternalLoggerFactory.getInstance(FlowControlHandler.class);
 
     private final boolean releaseMessages;
@@ -121,7 +119,6 @@ public class FlowControlHandler extends ChannelDuplexHandler {
 
     @Override
     public void handlerRemoved(ChannelHandlerContext ctx) throws Exception {
-        super.handlerRemoved(ctx);
         if (!isQueueEmpty()) {
             dequeue(ctx, queue.size());
         }
@@ -228,12 +225,7 @@ public class FlowControlHandler extends ChannelDuplexHandler {
         private static final int DEFAULT_NUM_ELEMENTS = 2;
 
         private static final ObjectPool<RecyclableArrayDeque> RECYCLER = ObjectPool.newPool(
-                new ObjectCreator<RecyclableArrayDeque>() {
-            @Override
-            public RecyclableArrayDeque newObject(Handle<RecyclableArrayDeque> handle) {
-                return new RecyclableArrayDeque(DEFAULT_NUM_ELEMENTS, handle);
-            }
-        });
+                handle -> new RecyclableArrayDeque(DEFAULT_NUM_ELEMENTS, handle));
 
         public static RecyclableArrayDeque newInstance() {
             return RECYCLER.get();

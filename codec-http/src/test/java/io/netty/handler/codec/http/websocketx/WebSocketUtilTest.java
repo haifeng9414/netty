@@ -17,15 +17,8 @@ package io.netty.handler.codec.http.websocketx;
 
 import org.junit.Test;
 
-import io.netty.buffer.ByteBuf;
-import io.netty.buffer.ByteBufUtil;
-import io.netty.buffer.Unpooled;
-import io.netty.handler.codec.base64.Base64;
-import io.netty.util.CharsetUtil;
-import io.netty.util.internal.EmptyArrays;
+import java.util.concurrent.ThreadLocalRandom;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
 public class WebSocketUtilTest {
@@ -34,7 +27,7 @@ public class WebSocketUtilTest {
     private static final int NUM_ITERATIONS = 1000;
 
     private static void assertRandomWithinBoundaries(int min, int max) {
-        int r = WebSocketUtil.randomNumber(min, max);
+        int r = ThreadLocalRandom.current().nextInt(min, max + 1);
         assertTrue(min <= r && r <= max);
     }
 
@@ -49,26 +42,4 @@ public class WebSocketUtilTest {
         }
     }
 
-    @Test
-    public void testBase64() {
-        String base64 = WebSocketUtil.base64(EmptyArrays.EMPTY_BYTES);
-        assertNotNull(base64);
-        assertTrue(base64.isEmpty());
-
-        base64 = WebSocketUtil.base64("foo".getBytes(CharsetUtil.UTF_8));
-        assertEquals(base64, "Zm9v");
-
-        base64 = WebSocketUtil.base64("bar".getBytes(CharsetUtil.UTF_8));
-        ByteBuf src = Unpooled.wrappedBuffer(base64.getBytes(CharsetUtil.UTF_8));
-        try {
-            ByteBuf dst = Base64.decode(src);
-            try {
-                assertEquals(new String(ByteBufUtil.getBytes(dst), CharsetUtil.UTF_8), "bar");
-            } finally {
-                dst.release();
-            }
-        } finally {
-            src.release();
-        }
-    }
 }

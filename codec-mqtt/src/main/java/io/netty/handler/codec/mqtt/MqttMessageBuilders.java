@@ -269,7 +269,7 @@ public final class MqttMessageBuilders {
 
         public UnsubscribeBuilder addTopicFilter(String topic) {
             if (topicFilters == null) {
-                topicFilters = new ArrayList<String>(5);
+                topicFilters = new ArrayList<>(5);
             }
             topicFilters.add(topic);
             return this;

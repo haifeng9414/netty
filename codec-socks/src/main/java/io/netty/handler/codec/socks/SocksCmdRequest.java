@@ -15,10 +15,11 @@
  */
 package io.netty.handler.codec.socks;
 
+import static java.util.Objects.requireNonNull;
+
 import io.netty.buffer.ByteBuf;
 import io.netty.util.CharsetUtil;
 import io.netty.util.NetUtil;
-import io.netty.util.internal.ObjectUtil;
 
 import java.net.IDN;
 
@@ -36,10 +37,9 @@ public final class SocksCmdRequest extends SocksRequest {
 
     public SocksCmdRequest(SocksCmdType cmdType, SocksAddressType addressType, String host, int port) {
         super(SocksRequestType.CMD);
-        ObjectUtil.checkNotNull(cmdType, "cmdType");
-        ObjectUtil.checkNotNull(addressType, "addressType");
-        ObjectUtil.checkNotNull(host, "host");
-
+        requireNonNull(cmdType, "cmdType");
+        requireNonNull(addressType, "addressType");
+        requireNonNull(host, "host");
         switch (addressType) {
             case IPv4:
                 if (!NetUtil.isValidIpV4Address(host)) {

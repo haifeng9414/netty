@@ -15,6 +15,16 @@
  */
 package io.netty.handler.codec;
 
+import static java.util.Objects.requireNonNull;
+
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.ByteBufAllocator;
+import io.netty.buffer.SwappedByteBuf;
+import io.netty.buffer.Unpooled;
+import io.netty.util.ByteProcessor;
+import io.netty.util.Signal;
+import io.netty.util.internal.StringUtil;
+
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
@@ -23,15 +33,6 @@ import java.nio.channels.FileChannel;
 import java.nio.channels.GatheringByteChannel;
 import java.nio.channels.ScatteringByteChannel;
 import java.nio.charset.Charset;
-
-import io.netty.buffer.ByteBuf;
-import io.netty.buffer.ByteBufAllocator;
-import io.netty.buffer.SwappedByteBuf;
-import io.netty.buffer.Unpooled;
-import io.netty.util.ByteProcessor;
-import io.netty.util.Signal;
-import io.netty.util.internal.ObjectUtil;
-import io.netty.util.internal.StringUtil;
 
 /**
  * Special {@link ByteBuf} implementation which is used by the {@link ReplayingDecoder}
@@ -456,24 +457,14 @@ final class ReplayingDecoderByteBuf extends ByteBuf {
     }
 
     @Override
-    public ByteBuf markReaderIndex() {
-        buffer.markReaderIndex();
-        return this;
-    }
-
-    @Override
-    public ByteBuf markWriterIndex() {
-        throw reject();
-    }
-
-    @Override
     public ByteOrder order() {
         return buffer.order();
     }
 
     @Override
     public ByteBuf order(ByteOrder endianness) {
-        if (ObjectUtil.checkNotNull(endianness, "endianness") == order()) {
+        requireNonNull(endianness, "endianness");
+        if (endianness == order()) {
             return this;
         }
 
@@ -709,17 +700,6 @@ final class ReplayingDecoderByteBuf extends ByteBuf {
     public CharSequence readCharSequence(int length, Charset charset) {
         checkReadableBytes(length);
         return buffer.readCharSequence(length, charset);
-    }
-
-    @Override
-    public ByteBuf resetReaderIndex() {
-        buffer.resetReaderIndex();
-        return this;
-    }
-
-    @Override
-    public ByteBuf resetWriterIndex() {
-        throw reject();
     }
 
     @Override

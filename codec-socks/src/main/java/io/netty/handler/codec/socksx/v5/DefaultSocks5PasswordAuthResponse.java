@@ -15,8 +15,9 @@
  */
 package io.netty.handler.codec.socksx.v5;
 
+import static java.util.Objects.requireNonNull;
+
 import io.netty.handler.codec.DecoderResult;
-import io.netty.util.internal.ObjectUtil;
 import io.netty.util.internal.StringUtil;
 
 /**
@@ -27,7 +28,9 @@ public class DefaultSocks5PasswordAuthResponse extends AbstractSocks5Message imp
     private final Socks5PasswordAuthStatus status;
 
     public DefaultSocks5PasswordAuthResponse(Socks5PasswordAuthStatus status) {
-        this.status = ObjectUtil.checkNotNull(status, "status");
+        requireNonNull(status, "status");
+
+        this.status = status;
     }
 
     @Override

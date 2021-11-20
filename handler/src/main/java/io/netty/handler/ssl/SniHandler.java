@@ -15,6 +15,8 @@
  */
 package io.netty.handler.ssl;
 
+import static java.util.Objects.requireNonNull;
+
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.DecoderException;
@@ -24,7 +26,6 @@ import io.netty.util.Mapping;
 import io.netty.util.ReferenceCountUtil;
 import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.Promise;
-import io.netty.util.internal.ObjectUtil;
 import io.netty.util.internal.PlatformDependent;
 
 /**
@@ -69,7 +70,7 @@ public class SniHandler extends AbstractSniHandler<SslContext> {
      */
     @SuppressWarnings("unchecked")
     public SniHandler(AsyncMapping<? super String, ? extends SslContext> mapping) {
-        this.mapping = (AsyncMapping<String, SslContext>) ObjectUtil.checkNotNull(mapping, "mapping");
+        this.mapping = (AsyncMapping<String, SslContext>) requireNonNull(mapping, "mapping");
     }
 
     /**
@@ -94,7 +95,7 @@ public class SniHandler extends AbstractSniHandler<SslContext> {
      */
     @Override
     protected Future<SslContext> lookup(ChannelHandlerContext ctx, String hostname) throws Exception {
-        return mapping.map(hostname, ctx.executor().<SslContext>newPromise());
+        return mapping.map(hostname, ctx.executor().newPromise());
     }
 
     @Override
@@ -155,7 +156,7 @@ public class SniHandler extends AbstractSniHandler<SslContext> {
         private final Mapping<? super String, ? extends SslContext> mapping;
 
         private AsyncMappingAdapter(Mapping<? super String, ? extends SslContext> mapping) {
-            this.mapping = ObjectUtil.checkNotNull(mapping, "mapping");
+            this.mapping = requireNonNull(mapping, "mapping");
         }
 
         @Override

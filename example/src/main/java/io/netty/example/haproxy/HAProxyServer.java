@@ -22,8 +22,9 @@ import io.netty.buffer.ByteBufUtil;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.EventLoopGroup;
+import io.netty.channel.MultithreadEventLoopGroup;
 import io.netty.channel.SimpleChannelInboundHandler;
-import io.netty.channel.nio.NioEventLoopGroup;
+import io.netty.channel.nio.NioHandler;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.handler.codec.haproxy.HAProxyMessage;
@@ -36,8 +37,8 @@ public final class HAProxyServer {
     static final int PORT = Integer.parseInt(System.getProperty("port", "8080"));
 
     public static void main(String[] args) throws Exception {
-        EventLoopGroup bossGroup = new NioEventLoopGroup(1);
-        EventLoopGroup workerGroup = new NioEventLoopGroup();
+        EventLoopGroup bossGroup = new MultithreadEventLoopGroup(1, NioHandler.newFactory());
+        EventLoopGroup workerGroup = new MultithreadEventLoopGroup(NioHandler.newFactory());
         try {
             ServerBootstrap b = new ServerBootstrap();
             b.group(bossGroup, workerGroup)
@@ -57,9 +58,9 @@ public final class HAProxyServer {
             ch.pipeline().addLast(
                     new LoggingHandler(LogLevel.DEBUG),
                     new HAProxyMessageDecoder(),
-                    new SimpleChannelInboundHandler() {
+                    new SimpleChannelInboundHandler<Object>() {
                         @Override
-                        protected void channelRead0(ChannelHandlerContext ctx, Object msg) throws Exception {
+                        protected void messageReceived(ChannelHandlerContext ctx, Object msg) {
                             if (msg instanceof HAProxyMessage) {
                                 System.out.println("proxy message: " + msg);
                             } else if (msg instanceof ByteBuf) {

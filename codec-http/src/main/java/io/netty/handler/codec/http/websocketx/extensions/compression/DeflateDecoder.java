@@ -30,9 +30,7 @@ import io.netty.handler.codec.http.websocketx.WebSocketFrame;
 import io.netty.handler.codec.http.websocketx.extensions.WebSocketExtensionDecoder;
 import io.netty.handler.codec.http.websocketx.extensions.WebSocketExtensionFilter;
 
-import java.util.List;
-
-import static io.netty.util.internal.ObjectUtil.*;
+import java.util.Objects;
 
 /**
  * Deflate implementation of a payload decompressor for
@@ -61,7 +59,7 @@ abstract class DeflateDecoder extends WebSocketExtensionDecoder {
      */
     DeflateDecoder(boolean noContext, WebSocketExtensionFilter extensionDecoderFilter) {
         this.noContext = noContext;
-        this.extensionDecoderFilter = checkNotNull(extensionDecoderFilter, "extensionDecoderFilter");
+        this.extensionDecoderFilter = Objects.requireNonNull(extensionDecoderFilter, "extensionDecoderFilter");
     }
 
     /**
@@ -76,7 +74,7 @@ abstract class DeflateDecoder extends WebSocketExtensionDecoder {
     protected abstract int newRsv(WebSocketFrame msg);
 
     @Override
-    protected void decode(ChannelHandlerContext ctx, WebSocketFrame msg, List<Object> out) throws Exception {
+    protected void decode(ChannelHandlerContext ctx, WebSocketFrame msg) throws Exception {
         final ByteBuf decompressedContent = decompressContent(ctx, msg);
 
         final WebSocketFrame outMsg;
@@ -90,7 +88,7 @@ abstract class DeflateDecoder extends WebSocketExtensionDecoder {
             throw new CodecException("unexpected frame type: " + msg.getClass().getName());
         }
 
-        out.add(outMsg);
+        ctx.fireChannelRead(outMsg);
     }
 
     @Override

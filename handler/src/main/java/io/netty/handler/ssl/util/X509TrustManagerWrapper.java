@@ -24,7 +24,7 @@ import java.net.Socket;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 
-import static io.netty.util.internal.ObjectUtil.*;
+import static java.util.Objects.requireNonNull;
 
 @SuppressJava6Requirement(reason = "Usage guarded by java version check")
 final class X509TrustManagerWrapper extends X509ExtendedTrustManager {
@@ -32,7 +32,7 @@ final class X509TrustManagerWrapper extends X509ExtendedTrustManager {
     private final X509TrustManager delegate;
 
     X509TrustManagerWrapper(X509TrustManager delegate) {
-        this.delegate = checkNotNull(delegate, "delegate");
+        this.delegate = requireNonNull(delegate, "delegate");
     }
 
     @Override

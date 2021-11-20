@@ -21,8 +21,8 @@ import io.netty.util.internal.UnstableApi;
 
 import java.net.IDN;
 
-import static io.netty.util.internal.ObjectUtil.checkNotNull;
 import static io.netty.util.internal.ObjectUtil.checkPositiveOrZero;
+import static java.util.Objects.requireNonNull;
 
 /**
  * A skeletal implementation of {@link DnsRecord}.
@@ -70,13 +70,13 @@ public abstract class AbstractDnsRecord implements DnsRecord {
         //   - https://github.com/netty/netty/issues/4937
         //   - https://github.com/netty/netty/issues/4935
         this.name = appendTrailingDot(IDNtoASCII(name));
-        this.type = checkNotNull(type, "type");
+        this.type = requireNonNull(type, "type");
         this.dnsClass = (short) dnsClass;
         this.timeToLive = timeToLive;
     }
 
     private static String IDNtoASCII(String name) {
-        checkNotNull(name, "name");
+        requireNonNull(name, "name");
         if (PlatformDependent.isAndroid() && DefaultDnsRecordDecoder.ROOT.equals(name)) {
             // Prior Android 10 there was a bug that did not correctly parse ".".
             //

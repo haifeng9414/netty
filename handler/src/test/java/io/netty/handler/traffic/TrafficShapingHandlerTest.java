@@ -22,6 +22,9 @@ import static org.junit.Assert.assertNull;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 
+import io.netty.channel.ChannelHandler;
+import io.netty.channel.MultithreadEventLoopGroup;
+import io.netty.channel.local.LocalHandler;
 import org.junit.AfterClass;
 import org.junit.Test;
 
@@ -30,9 +33,7 @@ import io.netty.bootstrap.ServerBootstrap;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
-import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.channel.ChannelInitializer;
-import io.netty.channel.DefaultEventLoopGroup;
 import io.netty.channel.local.LocalAddress;
 import io.netty.channel.local.LocalChannel;
 import io.netty.channel.local.LocalServerChannel;
@@ -43,7 +44,8 @@ public class TrafficShapingHandlerTest {
 
     private static final long READ_LIMIT_BYTES_PER_SECOND = 1;
     private static final ScheduledExecutorService SES = Executors.newSingleThreadScheduledExecutor();
-    private static final DefaultEventLoopGroup GROUP = new DefaultEventLoopGroup(1);
+    private static final MultithreadEventLoopGroup GROUP =
+            new MultithreadEventLoopGroup(1, LocalHandler.newFactory());
 
     @AfterClass
     public static void destroy() {
@@ -80,10 +82,10 @@ public class TrafficShapingHandlerTest {
             serverBootstrap.channel(LocalServerChannel.class).group(GROUP, GROUP)
                     .childHandler(new ChannelInitializer<Channel>() {
                         @Override
-                        protected void initChannel(Channel ch) throws Exception {
-                            ch.pipeline().addLast(new ChannelInboundHandlerAdapter() {
+                        protected void initChannel(Channel ch) {
+                            ch.pipeline().addLast(new ChannelHandler() {
                                 @Override
-                                public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
+                                public void channelRead(ChannelHandlerContext ctx, Object msg)  {
                                     ctx.writeAndFlush(msg);
                                 }
                             });
@@ -94,7 +96,7 @@ public class TrafficShapingHandlerTest {
             Bootstrap bootstrap = new Bootstrap();
             bootstrap.channel(LocalChannel.class).group(GROUP).handler(new ChannelInitializer<Channel>() {
                 @Override
-                protected void initChannel(Channel ch) throws Exception {
+                protected void initChannel(Channel ch) {
                     ch.pipeline().addLast("traffic-shaping", trafficHandler);
                 }
             });
@@ -105,11 +107,8 @@ public class TrafficShapingHandlerTest {
             ch.writeAndFlush(Unpooled.wrappedBuffer("bar".getBytes(CharsetUtil.UTF_8))).await();
             assertNotNull(attr.get());
             final Channel clientChannel = ch;
-            ch.eventLoop().submit(new Runnable() {
-                @Override
-                public void run() {
-                    clientChannel.pipeline().remove("traffic-shaping");
-                }
+            ch.eventLoop().submit(() -> {
+                clientChannel.pipeline().remove("traffic-shaping");
             }).await();
             //the attribute--reopen task must be released.
             assertNull(attr.get());

@@ -29,8 +29,8 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
-import static io.netty.util.internal.ObjectUtil.checkNotNull;
 import static io.netty.util.internal.ObjectUtil.intValue;
+import static java.util.Objects.requireNonNull;
 
 /**
  * A {@link DnsNameResolver} builder.
@@ -173,7 +173,7 @@ public final class DnsNameResolverBuilder {
      */
     public DnsNameResolverBuilder dnsQueryLifecycleObserverFactory(DnsQueryLifecycleObserverFactory
                                                                            lifecycleObserverFactory) {
-        this.dnsQueryLifecycleObserverFactory = checkNotNull(lifecycleObserverFactory, "lifecycleObserverFactory");
+        this.dnsQueryLifecycleObserverFactory = requireNonNull(lifecycleObserverFactory, "lifecycleObserverFactory");
         return this;
     }
 
@@ -319,21 +319,6 @@ public final class DnsNameResolverBuilder {
     }
 
     /**
-     * Sets if this resolver should generate the detailed trace information in an exception message so that
-     * it is easier to understand the cause of resolution failure.
-     *
-     * @param traceEnabled true if trace is enabled
-     * @return {@code this}
-     * @deprecated Prefer to {@linkplain #dnsQueryLifecycleObserverFactory(DnsQueryLifecycleObserverFactory) configure}
-     * a {@link LoggingDnsQueryLifeCycleObserverFactory} instead.
-     */
-    @Deprecated
-    public DnsNameResolverBuilder traceEnabled(boolean traceEnabled) {
-        this.traceEnabled = traceEnabled;
-        return this;
-    }
-
-    /**
      * Sets the capacity of the datagram packet buffer (in bytes).  The default value is {@code 4096} bytes.
      *
      * @param maxPayloadSize the capacity of the datagram packet buffer
@@ -378,7 +363,7 @@ public final class DnsNameResolverBuilder {
      */
     public DnsNameResolverBuilder nameServerProvider(DnsServerAddressStreamProvider dnsServerAddressStreamProvider) {
         this.dnsServerAddressStreamProvider =
-                checkNotNull(dnsServerAddressStreamProvider, "dnsServerAddressStreamProvider");
+                requireNonNull(dnsServerAddressStreamProvider, "dnsServerAddressStreamProvider");
         return this;
     }
 
@@ -389,9 +374,9 @@ public final class DnsNameResolverBuilder {
      * @return {@code this}
      */
     public DnsNameResolverBuilder searchDomains(Iterable<String> searchDomains) {
-        checkNotNull(searchDomains, "searchDomains");
+        requireNonNull(searchDomains, "searchDomains");
 
-        final List<String> list = new ArrayList<String>(4);
+        final List<String> list = new ArrayList<>(4);
 
         for (String f : searchDomains) {
             if (f == null) {
@@ -485,7 +470,6 @@ public final class DnsNameResolverBuilder {
                 resolvedAddressTypes,
                 recursionDesired,
                 maxQueriesPerResolve,
-                traceEnabled,
                 maxPayloadSize,
                 optResourceEnabled,
                 hostsFileEntriesResolver,
@@ -543,7 +527,6 @@ public final class DnsNameResolverBuilder {
         copiedBuilder.resolvedAddressTypes(resolvedAddressTypes);
         copiedBuilder.recursionDesired(recursionDesired);
         copiedBuilder.maxQueriesPerResolve(maxQueriesPerResolve);
-        copiedBuilder.traceEnabled(traceEnabled);
         copiedBuilder.maxPayloadSize(maxPayloadSize);
         copiedBuilder.optResourceEnabled(optResourceEnabled);
         copiedBuilder.hostsFileEntriesResolver(hostsFileEntriesResolver);

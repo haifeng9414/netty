@@ -20,17 +20,17 @@ import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
+import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
-import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelPipeline;
 import io.netty.channel.ChannelPromise;
-import io.netty.channel.nio.NioEventLoopGroup;
+import io.netty.channel.MultithreadEventLoopGroup;
+import io.netty.channel.nio.NioHandler;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpHeaderValues;
-import io.netty.handler.codec.http2.Http2TestUtil.Http2Runnable;
 import io.netty.util.AsciiString;
 import io.netty.util.CharsetUtil;
 import io.netty.util.NetUtil;
@@ -40,8 +40,6 @@ import org.junit.Before;
 import org.junit.Test;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
-import org.mockito.invocation.InvocationOnMock;
-import org.mockito.stubbing.Answer;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -91,24 +89,18 @@ public class DataCompressionHttp2Test {
     @Before
     public void setup() throws InterruptedException, Http2Exception {
         MockitoAnnotations.initMocks(this);
-        doAnswer(new Answer<Void>() {
-            @Override
-            public Void answer(InvocationOnMock invocation) throws Throwable {
-                if (invocation.getArgument(4)) {
-                    serverConnection.stream((Integer) invocation.getArgument(1)).close();
-                }
-                return null;
+        doAnswer(invocation -> {
+            if (invocation.getArgument(4)) {
+                serverConnection.stream((Integer) invocation.getArgument(1)).close();
             }
+            return null;
         }).when(serverListener).onHeadersRead(any(ChannelHandlerContext.class), anyInt(), any(Http2Headers.class),
                 anyInt(), anyBoolean());
-        doAnswer(new Answer<Void>() {
-            @Override
-            public Void answer(InvocationOnMock invocation) throws Throwable {
-                if (invocation.getArgument(7)) {
-                    serverConnection.stream((Integer) invocation.getArgument(1)).close();
-                }
-                return null;
+        doAnswer(invocation -> {
+            if (invocation.getArgument(7)) {
+                serverConnection.stream((Integer) invocation.getArgument(1)).close();
             }
+            return null;
         }).when(serverListener).onHeadersRead(any(ChannelHandlerContext.class), anyInt(), any(Http2Headers.class),
                 anyInt(), anyShort(), anyBoolean(), anyInt(), anyBoolean());
     }
@@ -147,12 +139,9 @@ public class DataCompressionHttp2Test {
         final Http2Headers headers = new DefaultHttp2Headers().method(GET).path(PATH)
                 .set(HttpHeaderNames.CONTENT_ENCODING, HttpHeaderValues.GZIP);
 
-        runInChannel(clientChannel, new Http2Runnable() {
-            @Override
-            public void run() throws Http2Exception {
-                clientEncoder.writeHeaders(ctxClient(), 3, headers, 0, true, newPromiseClient());
-                clientHandler.flush(ctxClient());
-            }
+        runInChannel(clientChannel, () -> {
+            clientEncoder.writeHeaders(ctxClient(), 3, headers, 0, true, newPromiseClient());
+            clientHandler.flush(ctxClient());
         });
         awaitServer();
         verify(serverListener).onHeadersRead(any(ChannelHandlerContext.class), eq(3), eq(headers), eq(0),
@@ -168,13 +157,10 @@ public class DataCompressionHttp2Test {
             final Http2Headers headers = new DefaultHttp2Headers().method(POST).path(PATH)
                     .set(HttpHeaderNames.CONTENT_ENCODING, HttpHeaderValues.GZIP);
 
-            runInChannel(clientChannel, new Http2Runnable() {
-                @Override
-                public void run() throws Http2Exception {
-                    clientEncoder.writeHeaders(ctxClient(), 3, headers, 0, false, newPromiseClient());
-                    clientEncoder.writeData(ctxClient(), 3, data.retain(), 0, true, newPromiseClient());
-                    clientHandler.flush(ctxClient());
-                }
+            runInChannel(clientChannel, () -> {
+                clientEncoder.writeHeaders(ctxClient(), 3, headers, 0, false, newPromiseClient());
+                clientEncoder.writeData(ctxClient(), 3, data.retain(), 0, true, newPromiseClient());
+                clientHandler.flush(ctxClient());
             });
             awaitServer();
             assertEquals(text, serverOut.toString(CharsetUtil.UTF_8.name()));
@@ -192,13 +178,10 @@ public class DataCompressionHttp2Test {
             final Http2Headers headers = new DefaultHttp2Headers().method(POST).path(PATH)
                     .set(HttpHeaderNames.CONTENT_ENCODING, HttpHeaderValues.GZIP);
 
-            runInChannel(clientChannel, new Http2Runnable() {
-                @Override
-                public void run() throws Http2Exception {
-                    clientEncoder.writeHeaders(ctxClient(), 3, headers, 0, false, newPromiseClient());
-                    clientEncoder.writeData(ctxClient(), 3, data.retain(), 0, true, newPromiseClient());
-                    clientHandler.flush(ctxClient());
-                }
+            runInChannel(clientChannel, () -> {
+                clientEncoder.writeHeaders(ctxClient(), 3, headers, 0, false, newPromiseClient());
+                clientEncoder.writeData(ctxClient(), 3, data.retain(), 0, true, newPromiseClient());
+                clientHandler.flush(ctxClient());
             });
             awaitServer();
             assertEquals(text, serverOut.toString(CharsetUtil.UTF_8.name()));
@@ -218,14 +201,11 @@ public class DataCompressionHttp2Test {
             final Http2Headers headers = new DefaultHttp2Headers().method(POST).path(PATH)
                     .set(HttpHeaderNames.CONTENT_ENCODING, HttpHeaderValues.GZIP);
 
-            runInChannel(clientChannel, new Http2Runnable() {
-                @Override
-                public void run() throws Http2Exception {
-                    clientEncoder.writeHeaders(ctxClient(), 3, headers, 0, false, newPromiseClient());
-                    clientEncoder.writeData(ctxClient(), 3, data1.retain(), 0, false, newPromiseClient());
-                    clientEncoder.writeData(ctxClient(), 3, data2.retain(), 0, true, newPromiseClient());
-                    clientHandler.flush(ctxClient());
-                }
+            runInChannel(clientChannel, () -> {
+                clientEncoder.writeHeaders(ctxClient(), 3, headers, 0, false, newPromiseClient());
+                clientEncoder.writeData(ctxClient(), 3, data1.retain(), 0, false, newPromiseClient());
+                clientEncoder.writeData(ctxClient(), 3, data2.retain(), 0, true, newPromiseClient());
+                clientHandler.flush(ctxClient());
             });
             awaitServer();
             assertEquals(text1 + text2, serverOut.toString(CharsetUtil.UTF_8.name()));
@@ -246,16 +226,13 @@ public class DataCompressionHttp2Test {
             final Http2Headers headers = new DefaultHttp2Headers().method(POST).path(PATH)
                     .set(HttpHeaderNames.CONTENT_ENCODING, HttpHeaderValues.DEFLATE);
 
-            runInChannel(clientChannel, new Http2Runnable() {
-                @Override
-                public void run() throws Http2Exception {
-                    clientEncoder.writeHeaders(ctxClient(), 3, headers, 0, false, newPromiseClient());
-                    clientEncoder.writeData(ctxClient(), 3, data.retain(), 0, true, newPromiseClient());
-                    clientHandler.flush(ctxClient());
-                }
+            runInChannel(clientChannel, () -> {
+                clientEncoder.writeHeaders(ctxClient(), 3, headers, 0, false, newPromiseClient());
+                clientEncoder.writeData(ctxClient(), 3, data.retain(), 0, true, newPromiseClient());
+                clientHandler.flush(ctxClient());
             });
             awaitServer();
-            assertEquals(data.resetReaderIndex().toString(CharsetUtil.UTF_8),
+            assertEquals(data.readerIndex(0).toString(CharsetUtil.UTF_8),
                     serverOut.toString(CharsetUtil.UTF_8.name()));
         } finally {
             data.release();
@@ -280,25 +257,23 @@ public class DataCompressionHttp2Test {
             }
         });
 
-        doAnswer(new Answer<Integer>() {
-            @Override
-            public Integer answer(InvocationOnMock in) throws Throwable {
-                ByteBuf buf = (ByteBuf) in.getArguments()[2];
-                int padding = (Integer) in.getArguments()[3];
-                int processedBytes = buf.readableBytes() + padding;
+        doAnswer(in -> {
+            ByteBuf buf = (ByteBuf) in.getArguments()[2];
+            int padding = (Integer) in.getArguments()[3];
+            int processedBytes = buf.readableBytes() + padding;
 
-                buf.readBytes(serverOut, buf.readableBytes());
+            buf.readBytes(serverOut, buf.readableBytes());
 
-                if (in.getArgument(4)) {
-                    serverConnection.stream((Integer) in.getArgument(1)).close();
-                }
-                return processedBytes;
+            if (in.getArgument(4)) {
+                serverConnection.stream((Integer) in.getArgument(1)).close();
             }
+            return processedBytes;
         }).when(serverListener).onDataRead(any(ChannelHandlerContext.class), anyInt(),
                 any(ByteBuf.class), anyInt(), anyBoolean());
 
         final CountDownLatch serverChannelLatch = new CountDownLatch(1);
-        sb.group(new NioEventLoopGroup(), new NioEventLoopGroup());
+        sb.group(new MultithreadEventLoopGroup(NioHandler.newFactory()),
+                new MultithreadEventLoopGroup(NioHandler.newFactory()));
         sb.channel(NioServerSocketChannel.class);
         sb.childHandler(new ChannelInitializer<Channel>() {
             @Override
@@ -322,7 +297,7 @@ public class DataCompressionHttp2Test {
             }
         });
 
-        cb.group(new NioEventLoopGroup());
+        cb.group(new MultithreadEventLoopGroup(NioHandler.newFactory()));
         cb.channel(NioSocketChannel.class);
         cb.handler(new ChannelInitializer<Channel>() {
             @Override
@@ -345,7 +320,7 @@ public class DataCompressionHttp2Test {
                         .gracefulShutdownTimeoutMillis(0)
                         .codec(decoder, clientEncoder).build();
                 p.addLast(clientHandler);
-                p.addLast(new ChannelInboundHandlerAdapter() {
+                p.addLast(new ChannelHandler() {
                     public void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws Exception {
                         if (evt == Http2ConnectionPrefaceAndSettingsFrameWrittenEvent.INSTANCE) {
                             prefaceWrittenLatch.countDown();

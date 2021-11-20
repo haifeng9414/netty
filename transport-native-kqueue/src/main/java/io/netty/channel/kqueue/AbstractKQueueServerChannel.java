@@ -15,12 +15,15 @@
  */
 package io.netty.channel.kqueue;
 
+import static java.util.Objects.requireNonNull;
+
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelConfig;
 import io.netty.channel.ChannelMetadata;
 import io.netty.channel.ChannelOutboundBuffer;
 import io.netty.channel.ChannelPipeline;
 import io.netty.channel.EventLoop;
+import io.netty.channel.EventLoopGroup;
 import io.netty.channel.ServerChannel;
 import io.netty.util.internal.UnstableApi;
 
@@ -30,23 +33,25 @@ import java.net.SocketAddress;
 @UnstableApi
 public abstract class AbstractKQueueServerChannel extends AbstractKQueueChannel implements ServerChannel {
     private static final ChannelMetadata METADATA = new ChannelMetadata(false, 16);
+    private final EventLoopGroup childEventLoopGroup;
 
-    AbstractKQueueServerChannel(BsdSocket fd) {
-        this(fd, isSoErrorZero(fd));
+    AbstractKQueueServerChannel(EventLoop eventLoop, EventLoopGroup childEventLoopGroup, BsdSocket fd) {
+        this(eventLoop, childEventLoopGroup, fd, isSoErrorZero(fd));
     }
 
-    AbstractKQueueServerChannel(BsdSocket fd, boolean active) {
-        super(null, fd, active);
+    AbstractKQueueServerChannel(EventLoop eventLoop, EventLoopGroup childEventLoopGroup, BsdSocket fd, boolean active) {
+        super(null, eventLoop, fd, active);
+        this.childEventLoopGroup = requireNonNull(childEventLoopGroup, "childEventLoopGroup");
+    }
+
+    @Override
+    public EventLoopGroup childEventLoopGroup() {
+        return childEventLoopGroup;
     }
 
     @Override
     public ChannelMetadata metadata() {
         return METADATA;
-    }
-
-    @Override
-    protected boolean isCompatible(EventLoop loop) {
-        return loop instanceof KQueueEventLoop;
     }
 
     @Override
@@ -121,6 +126,7 @@ public abstract class AbstractKQueueServerChannel extends AbstractKQueueChannel 
                 if (exception != null) {
                     pipeline.fireExceptionCaught(exception);
                 }
+                readIfIsAutoRead();
             } finally {
                 readReadyFinally(config);
             }

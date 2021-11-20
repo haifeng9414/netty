@@ -15,24 +15,21 @@
  */
 package io.netty.handler.codec;
 
+import static java.util.Objects.requireNonNull;
+
 import io.netty.util.concurrent.FastThreadLocal;
 import io.netty.util.internal.MathUtil;
 
 import java.util.AbstractList;
 import java.util.RandomAccess;
 
-import static io.netty.util.internal.ObjectUtil.checkNotNull;
-
 /**
  * Special {@link AbstractList} implementation which is used within our codec base classes.
  */
 final class CodecOutputList extends AbstractList<Object> implements RandomAccess {
 
-    private static final CodecOutputListRecycler NOOP_RECYCLER = new CodecOutputListRecycler() {
-        @Override
-        public void recycle(CodecOutputList object) {
-            // drop on the floor and let the GC handle it.
-        }
+    private static final CodecOutputListRecycler NOOP_RECYCLER = object -> {
+        // drop on the floor and let the GC handle it.
     };
 
     private static final FastThreadLocal<CodecOutputLists> CODEC_OUTPUT_LISTS_POOL =
@@ -117,7 +114,7 @@ final class CodecOutputList extends AbstractList<Object> implements RandomAccess
 
     @Override
     public boolean add(Object element) {
-        checkNotNull(element, "element");
+        requireNonNull(element, "element");
         try {
             insert(size, element);
         } catch (IndexOutOfBoundsException ignore) {
@@ -131,7 +128,7 @@ final class CodecOutputList extends AbstractList<Object> implements RandomAccess
 
     @Override
     public Object set(int index, Object element) {
-        checkNotNull(element, "element");
+        requireNonNull(element, "element");
         checkIndex(index);
 
         Object old = array[index];
@@ -141,7 +138,7 @@ final class CodecOutputList extends AbstractList<Object> implements RandomAccess
 
     @Override
     public void add(int index, Object element) {
-        checkNotNull(element, "element");
+        requireNonNull(element, "element");
         checkIndex(index);
 
         if (size == array.length) {

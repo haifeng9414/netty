@@ -47,14 +47,11 @@ public class RecyclerTest {
     public void testThreadCanBeCollectedEvenIfHandledObjectIsReferenced() throws Exception {
         final Recycler<HandledObject> recycler = newRecycler(1024);
         final AtomicBoolean collected = new AtomicBoolean();
-        final AtomicReference<HandledObject> reference = new AtomicReference<HandledObject>();
-        Thread thread = new Thread(new Runnable() {
-            @Override
-            public void run() {
-                HandledObject object = recycler.get();
-                // Store a reference to the HandledObject to ensure it is not collected when the run method finish.
-                reference.set(object);
-            }
+        final AtomicReference<HandledObject> reference = new AtomicReference<>();
+        Thread thread = new Thread(() -> {
+            HandledObject object = recycler.get();
+            // Store a reference to the HandledObject to ensure it is not collected when the run method finish.
+            reference.set(object);
         }) {
             @Override
             protected void finalize() throws Throwable {
@@ -92,24 +89,16 @@ public class RecyclerTest {
     public void testMultipleRecycleAtDifferentThread() throws InterruptedException {
         Recycler<HandledObject> recycler = newRecycler(1024);
         final HandledObject object = recycler.get();
-        final AtomicReference<IllegalStateException> exceptionStore = new AtomicReference<IllegalStateException>();
-        final Thread thread1 = new Thread(new Runnable() {
-            @Override
-            public void run() {
-                object.recycle();
-            }
-        });
+        final AtomicReference<IllegalStateException> exceptionStore = new AtomicReference<>();
+        final Thread thread1 = new Thread(object::recycle);
         thread1.start();
         thread1.join();
 
-        final Thread thread2 = new Thread(new Runnable() {
-            @Override
-            public void run() {
-                try {
-                    object.recycle();
-                } catch (IllegalStateException e) {
-                    exceptionStore.set(e);
-                }
+        final Thread thread2 = new Thread(() -> {
+            try {
+                object.recycle();
+            } catch (IllegalStateException e) {
+                exceptionStore.set(e);
             }
         });
         thread2.start();

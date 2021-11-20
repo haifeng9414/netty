@@ -17,10 +17,8 @@ package io.netty.handler.codec.http2;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.Channel;
-import io.netty.channel.ChannelFuture;
-import io.netty.channel.ChannelFutureListener;
+import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
-import io.netty.channel.ChannelInboundHandler;
 import io.netty.channel.ChannelPromise;
 import io.netty.handler.codec.UnsupportedMessageTypeException;
 import io.netty.handler.codec.http.HttpServerUpgradeHandler.UpgradeEvent;
@@ -32,6 +30,7 @@ import io.netty.util.ReferenceCountUtil;
 import io.netty.util.ReferenceCounted;
 import io.netty.util.collection.IntObjectHashMap;
 import io.netty.util.collection.IntObjectMap;
+import io.netty.util.concurrent.Future;
 import io.netty.util.internal.UnstableApi;
 import io.netty.util.internal.logging.InternalLogLevel;
 import io.netty.util.internal.logging.InternalLogger;
@@ -127,7 +126,7 @@ import static io.netty.handler.codec.http2.Http2Error.NO_ERROR;
  *
  * <h3>Error Handling</h3>
  *
- * Exceptions and errors are propagated via {@link ChannelInboundHandler#exceptionCaught}. Exceptions that apply to
+ * Exceptions and errors are propagated via {@link ChannelHandler#exceptionCaught}. Exceptions that apply to
  * a specific HTTP/2 stream are wrapped in a {@link Http2FrameStreamException} and have the corresponding
  * {@link Http2FrameStream} object attached.
  *
@@ -187,16 +186,14 @@ public class Http2FrameCodec extends Http2ConnectionHandler {
      */
     final void forEachActiveStream(final Http2FrameStreamVisitor streamVisitor) throws Http2Exception {
         assert ctx.executor().inEventLoop();
+
         if (connection().numActiveStreams() > 0) {
-            connection().forEachActiveStream(new Http2StreamVisitor() {
-                @Override
-                public boolean visit(Http2Stream stream) {
-                    try {
-                        return streamVisitor.visit((Http2FrameStream) stream.getProperty(streamKey));
-                    } catch (Throwable cause) {
-                        onError(ctx, false, cause);
-                        return false;
-                    }
+            connection().forEachActiveStream(stream -> {
+                try {
+                    return streamVisitor.visit((Http2FrameStream) stream.getProperty(streamKey));
+                } catch (Throwable cause) {
+                    onError(ctx, false, cause);
+                    return false;
                 }
             });
         }
@@ -212,10 +209,9 @@ public class Http2FrameCodec extends Http2ConnectionHandler {
     }
 
     @Override
-    public final void handlerAdded(ChannelHandlerContext ctx) throws Exception {
+    public void handlerAdded0(ChannelHandlerContext ctx) throws Exception {
+        super.handlerAdded0(ctx);
         this.ctx = ctx;
-        super.handlerAdded(ctx);
-        handlerAdded0(ctx);
         // Must be after Http2ConnectionHandler does its initialization in handlerAdded above.
         // The server will not send a connection preface so we are good to send a window update.
         Http2Connection connection = connection();
@@ -240,10 +236,6 @@ public class Http2FrameCodec extends Http2ConnectionHandler {
         }
     }
 
-    void handlerAdded0(@SuppressWarnings("unsed") ChannelHandlerContext ctx) throws Exception {
-        // sub-class can override this for extra steps that needs to be done when the handler is added.
-    }
-
     /**
      * Handles the cleartext HTTP upgrade event. If an upgrade occurred, sends a simple response via
      * HTTP/2 on stream 1 (the stream specifically reserved for cleartext HTTP upgrade).
@@ -257,12 +249,7 @@ public class Http2FrameCodec extends Http2ConnectionHandler {
             // We schedule this on the EventExecutor to allow to have any extra handlers added to the pipeline
             // before we pass the event to the next handler. This is needed as the event may be called from within
             // handlerAdded(...) which will be run before other handlers will be added to the pipeline.
-            ctx.executor().execute(new Runnable() {
-                @Override
-                public void run() {
-                    ctx.fireUserEventTriggered(evt);
-                }
-            });
+            ctx.executor().execute(() -> ctx.fireUserEventTriggered(evt));
         } else if (evt instanceof UpgradeEvent) {
             UpgradeEvent upgrade = (UpgradeEvent) evt;
             try {
@@ -422,13 +409,10 @@ public class Http2FrameCodec extends Http2ConnectionHandler {
                 numBufferedStreams++;
                 // Clean up the stream being initialized if writing the headers fails and also
                 // decrement the number of buffered streams.
-                promise.addListener(new ChannelFutureListener() {
-                    @Override
-                    public void operationComplete(ChannelFuture channelFuture) {
-                        numBufferedStreams--;
+                promise.addListener(channelFuture -> {
+                    numBufferedStreams--;
 
-                        handleHeaderFuture(channelFuture, streamId);
-                    }
+                    handleHeaderFuture(channelFuture, streamId);
                 });
             } else {
                 handleHeaderFuture(promise, streamId);
@@ -436,7 +420,7 @@ public class Http2FrameCodec extends Http2ConnectionHandler {
         }
     }
 
-    private void handleHeaderFuture(ChannelFuture channelFuture, int streamId) {
+    private void handleHeaderFuture(Future<?> channelFuture, int streamId) {
         if (!channelFuture.isSuccess()) {
             frameStreamToInitializeMap.remove(streamId);
         }

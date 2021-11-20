@@ -21,8 +21,8 @@ import io.netty.buffer.ByteBufHolder;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
+import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelId;
-import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.channel.EventLoop;
 import io.netty.channel.ServerChannel;
 import io.netty.util.CharsetUtil;
@@ -82,12 +82,12 @@ import java.util.Set;
  *     <strong>allChannels.close().awaitUninterruptibly();</strong>
  * }
  *
- * public class MyHandler extends {@link ChannelInboundHandlerAdapter} {
+ * public class MyHandler implements {@link ChannelHandler} {
  *     {@code @Override}
  *     public void channelActive({@link ChannelHandlerContext} ctx) {
  *         // closed on shutdown.
  *         <strong>allChannels.add(ctx.channel());</strong>
- *         super.channelActive(ctx);
+ *         ctx.fireChannelActive();
  *     }
  * }
  * </pre>

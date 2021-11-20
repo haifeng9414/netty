@@ -15,8 +15,9 @@
  */
 package io.netty.handler.codec.stomp;
 
+import static java.util.Objects.requireNonNull;
+
 import io.netty.handler.codec.DecoderResult;
-import io.netty.util.internal.ObjectUtil;
 
 /**
  * Default implementation of {@link StompHeadersSubframe}.
@@ -32,7 +33,9 @@ public class DefaultStompHeadersSubframe implements StompHeadersSubframe {
     }
 
     DefaultStompHeadersSubframe(StompCommand command, DefaultStompHeaders headers) {
-        this.command = ObjectUtil.checkNotNull(command, "command");
+        requireNonNull(command, "command");
+
+        this.command = command;
         this.headers = headers == null ? new DefaultStompHeaders() : headers;
     }
 

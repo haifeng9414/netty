@@ -15,11 +15,12 @@
  */
 package io.netty.buffer;
 
+import static java.util.Objects.requireNonNull;
+
 import io.netty.util.ByteProcessor;
 import io.netty.util.IllegalReferenceCountException;
 import io.netty.util.ReferenceCountUtil;
 import io.netty.util.internal.EmptyArrays;
-import io.netty.util.internal.ObjectUtil;
 import io.netty.util.internal.RecyclableArrayList;
 
 import java.io.IOException;
@@ -39,7 +40,6 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.NoSuchElementException;
 
-import static io.netty.util.internal.ObjectUtil.checkNotNull;
 
 /**
  * A virtual buffer which shows multiple buffers as a single merged buffer.  It is recommended to use
@@ -62,13 +62,12 @@ public class CompositeByteBuf extends AbstractReferenceCountedByteBuf implements
 
     private CompositeByteBuf(ByteBufAllocator alloc, boolean direct, int maxNumComponents, int initSize) {
         super(AbstractByteBufAllocator.DEFAULT_MAX_CAPACITY);
-
-        this.alloc = ObjectUtil.checkNotNull(alloc, "alloc");
+        requireNonNull(alloc, "alloc");
         if (maxNumComponents < 1) {
             throw new IllegalArgumentException(
                     "maxNumComponents: " + maxNumComponents + " (expected: >= 1)");
         }
-
+        this.alloc = alloc;
         this.direct = direct;
         this.maxNumComponents = maxNumComponents;
         components = newCompArray(initSize, maxNumComponents);
@@ -232,7 +231,7 @@ public class CompositeByteBuf extends AbstractReferenceCountedByteBuf implements
      * ownership of all {@link ByteBuf} objects is transferred to this {@link CompositeByteBuf}.
      */
     public CompositeByteBuf addComponents(boolean increaseWriterIndex, ByteBuf... buffers) {
-        checkNotNull(buffers, "buffers");
+        requireNonNull(buffers, "buffers");
         addComponents0(increaseWriterIndex, componentCount, buffers, 0);
         consolidateIfNeeded();
         return this;
@@ -261,7 +260,7 @@ public class CompositeByteBuf extends AbstractReferenceCountedByteBuf implements
      * {@link CompositeByteBuf}.
      */
     public CompositeByteBuf addComponent(boolean increaseWriterIndex, int cIndex, ByteBuf buffer) {
-        checkNotNull(buffer, "buffer");
+        requireNonNull(buffer, "buffer");
         addComponent0(increaseWriterIndex, cIndex, buffer);
         consolidateIfNeeded();
         return this;
@@ -362,7 +361,7 @@ public class CompositeByteBuf extends AbstractReferenceCountedByteBuf implements
      * ownership of all {@link ByteBuf} objects is transferred to this {@link CompositeByteBuf}.
      */
     public CompositeByteBuf addComponents(int cIndex, ByteBuf... buffers) {
-        checkNotNull(buffers, "buffers");
+        requireNonNull(buffers, "buffers");
         addComponents0(false, cIndex, buffers, 0);
         consolidateIfNeeded();
         return this;
@@ -464,7 +463,7 @@ public class CompositeByteBuf extends AbstractReferenceCountedByteBuf implements
      * {@link CompositeByteBuf}.
      */
     public CompositeByteBuf addFlattenedComponents(boolean increaseWriterIndex, ByteBuf buffer) {
-        checkNotNull(buffer, "buffer");
+        requireNonNull(buffer, "buffer");
         final int ridx = buffer.readerIndex();
         final int widx = buffer.writerIndex();
         if (ridx == widx) {
@@ -532,7 +531,7 @@ public class CompositeByteBuf extends AbstractReferenceCountedByteBuf implements
             // If buffers also implements ByteBuf (e.g. CompositeByteBuf), it has to go to addComponent(ByteBuf).
             return addComponent(increaseIndex, cIndex, (ByteBuf) buffers);
         }
-        checkNotNull(buffers, "buffers");
+        requireNonNull(buffers, "buffers");
         Iterator<ByteBuf> it = buffers.iterator();
         try {
             checkComponentIndex(cIndex);
@@ -733,7 +732,7 @@ public class CompositeByteBuf extends AbstractReferenceCountedByteBuf implements
             return Collections.singletonList(slice);
         }
 
-        List<ByteBuf> sliceList = new ArrayList<ByteBuf>(componentCount - componentId);
+        List<ByteBuf> sliceList = new ArrayList<>(componentCount - componentId);
         sliceList.add(slice);
 
         // Add all the slices until there is nothing more left and then return the List.
@@ -1769,7 +1768,6 @@ public class CompositeByteBuf extends AbstractReferenceCountedByteBuf implements
             lastAccessed = null;
             clearComps();
             setIndex(0, 0);
-            adjustMarkers(readerIndex);
             return this;
         }
 
@@ -1796,7 +1794,6 @@ public class CompositeByteBuf extends AbstractReferenceCountedByteBuf implements
         int offset = c.offset;
         updateComponentOffsets(0);
         setIndex(readerIndex - offset, writerIndex - offset);
-        adjustMarkers(offset);
         return this;
     }
 
@@ -1817,7 +1814,6 @@ public class CompositeByteBuf extends AbstractReferenceCountedByteBuf implements
             lastAccessed = null;
             clearComps();
             setIndex(0, 0);
-            adjustMarkers(readerIndex);
             return this;
         }
 
@@ -1853,7 +1849,6 @@ public class CompositeByteBuf extends AbstractReferenceCountedByteBuf implements
         // Update indexes and markers.
         updateComponentOffsets(0);
         setIndex(0, writerIndex - readerIndex);
-        adjustMarkers(readerIndex);
         return this;
     }
 
@@ -1963,30 +1958,6 @@ public class CompositeByteBuf extends AbstractReferenceCountedByteBuf implements
     @Override
     public CompositeByteBuf clear() {
         super.clear();
-        return this;
-    }
-
-    @Override
-    public CompositeByteBuf markReaderIndex() {
-        super.markReaderIndex();
-        return this;
-    }
-
-    @Override
-    public CompositeByteBuf resetReaderIndex() {
-        super.resetReaderIndex();
-        return this;
-    }
-
-    @Override
-    public CompositeByteBuf markWriterIndex() {
-        super.markWriterIndex();
-        return this;
-    }
-
-    @Override
-    public CompositeByteBuf resetWriterIndex() {
-        super.resetWriterIndex();
         return this;
     }
 

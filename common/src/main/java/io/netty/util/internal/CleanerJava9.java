@@ -18,8 +18,10 @@ package io.netty.util.internal;
 import io.netty.util.internal.logging.InternalLogger;
 import io.netty.util.internal.logging.InternalLoggerFactory;
 
+import java.lang.invoke.MethodHandle;
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.MethodType;
 import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
 import java.nio.ByteBuffer;
 import java.security.AccessController;
 import java.security.PrivilegedAction;
@@ -30,41 +32,40 @@ import java.security.PrivilegedAction;
 final class CleanerJava9 implements Cleaner {
     private static final InternalLogger logger = InternalLoggerFactory.getInstance(CleanerJava9.class);
 
-    private static final Method INVOKE_CLEANER;
+    private static final MethodHandle INVOKE_CLEANER_HANDLE;
 
     static {
-        final Method method;
+        final MethodHandle invokeCleanerHandle;
         final Throwable error;
         if (PlatformDependent0.hasUnsafe()) {
             final ByteBuffer buffer = ByteBuffer.allocateDirect(1);
-            Object maybeInvokeMethod = AccessController.doPrivileged(new PrivilegedAction<Object>() {
-                @Override
-                public Object run() {
-                    try {
-                        // See https://bugs.openjdk.java.net/browse/JDK-8171377
-                        Method m = PlatformDependent0.UNSAFE.getClass().getDeclaredMethod(
-                                "invokeCleaner", ByteBuffer.class);
-                        m.invoke(PlatformDependent0.UNSAFE, buffer);
-                        return m;
-                    } catch (NoSuchMethodException e) {
-                        return e;
-                    } catch (InvocationTargetException e) {
-                        return e;
-                    } catch (IllegalAccessException e) {
-                        return e;
-                    }
+            Object maybeInvokeMethodHandle = AccessController.doPrivileged((PrivilegedAction<Object>) () -> {
+                try {
+                    MethodHandles.Lookup lookup = MethodHandles.lookup();
+                    // See https://bugs.openjdk.java.net/browse/JDK-8171377
+                    MethodHandle m = lookup.findVirtual(
+                            PlatformDependent0.UNSAFE.getClass(),
+                            "invokeCleaner",
+                            MethodType.methodType(void.class, ByteBuffer.class)).bindTo(PlatformDependent0.UNSAFE);
+                    m.invokeExact(buffer);
+                    return m;
+                } catch (NoSuchMethodException | InvocationTargetException | IllegalAccessException e) {
+                    return e;
+                } catch (Throwable cause) {
+                    PlatformDependent0.throwException(cause);
+                    return cause;
                 }
             });
 
-            if (maybeInvokeMethod instanceof Throwable) {
-                method = null;
-                error = (Throwable) maybeInvokeMethod;
+            if (maybeInvokeMethodHandle instanceof Throwable) {
+                invokeCleanerHandle = null;
+                error = (Throwable) maybeInvokeMethodHandle;
             } else {
-                method = (Method) maybeInvokeMethod;
+                invokeCleanerHandle = (MethodHandle) maybeInvokeMethodHandle;
                 error = null;
             }
         } else {
-            method = null;
+            invokeCleanerHandle = null;
             error = new UnsupportedOperationException("sun.misc.Unsafe unavailable");
         }
         if (error == null) {
@@ -72,11 +73,11 @@ final class CleanerJava9 implements Cleaner {
         } else {
             logger.debug("java.nio.ByteBuffer.cleaner(): unavailable", error);
         }
-        INVOKE_CLEANER = method;
+        INVOKE_CLEANER_HANDLE = invokeCleanerHandle;
     }
 
     static boolean isSupported() {
-        return INVOKE_CLEANER != null;
+        return INVOKE_CLEANER_HANDLE != null;
     }
 
     @Override
@@ -85,7 +86,7 @@ final class CleanerJava9 implements Cleaner {
         // See https://bugs.openjdk.java.net/browse/JDK-8191053.
         if (System.getSecurityManager() == null) {
             try {
-                INVOKE_CLEANER.invoke(PlatformDependent0.UNSAFE, buffer);
+                INVOKE_CLEANER_HANDLE.invokeExact(buffer);
             } catch (Throwable cause) {
                 PlatformDependent0.throwException(cause);
             }
@@ -95,18 +96,15 @@ final class CleanerJava9 implements Cleaner {
     }
 
     private static void freeDirectBufferPrivileged(final ByteBuffer buffer) {
-        Exception error = AccessController.doPrivileged(new PrivilegedAction<Exception>() {
-            @Override
-            public Exception run() {
-                try {
-                    INVOKE_CLEANER.invoke(PlatformDependent0.UNSAFE, buffer);
-                } catch (InvocationTargetException e) {
-                    return e;
-                } catch (IllegalAccessException e) {
-                    return e;
-                }
-                return null;
+        Exception error = AccessController.doPrivileged((PrivilegedAction<Exception>) () -> {
+            try {
+                INVOKE_CLEANER_HANDLE.invokeExact(PlatformDependent0.UNSAFE, buffer);
+            } catch (InvocationTargetException | IllegalAccessException e) {
+                return e;
+            } catch (Throwable cause) {
+                PlatformDependent.throwException(cause);
             }
+            return null;
         });
         if (error != null) {
             PlatformDependent0.throwException(error);

@@ -23,12 +23,12 @@ import io.netty.channel.WriteBufferWaterMark;
 import io.netty.channel.socket.SocketChannelConfig;
 import io.netty.channel.unix.DomainSocketChannelConfig;
 import io.netty.channel.unix.DomainSocketReadMode;
-import io.netty.util.internal.ObjectUtil;
 import io.netty.util.internal.UnstableApi;
 
 import java.io.IOException;
 import java.util.Map;
 
+import static java.util.Objects.requireNonNull;
 import static io.netty.channel.ChannelOption.ALLOW_HALF_CLOSURE;
 import static io.netty.channel.ChannelOption.SO_RCVBUF;
 import static io.netty.channel.ChannelOption.SO_SNDBUF;
@@ -162,7 +162,8 @@ public final class KQueueDomainSocketChannelConfig extends KQueueChannelConfig i
 
     @Override
     public KQueueDomainSocketChannelConfig setReadMode(DomainSocketReadMode mode) {
-        this.mode = ObjectUtil.checkNotNull(mode, "mode");
+        requireNonNull(mode, "mode");
+        this.mode = mode;
         return this;
     }
 
@@ -171,6 +172,7 @@ public final class KQueueDomainSocketChannelConfig extends KQueueChannelConfig i
         return mode;
     }
 
+    @Override
     public int getSendBufferSize() {
         try {
             return ((KQueueDomainSocketChannel) channel).socket.getSendBufferSize();
@@ -179,6 +181,7 @@ public final class KQueueDomainSocketChannelConfig extends KQueueChannelConfig i
         }
     }
 
+    @Override
     public KQueueDomainSocketChannelConfig setSendBufferSize(int sendBufferSize) {
         try {
             ((KQueueDomainSocketChannel) channel).socket.setSendBufferSize(sendBufferSize);
@@ -188,6 +191,7 @@ public final class KQueueDomainSocketChannelConfig extends KQueueChannelConfig i
         }
     }
 
+    @Override
     public int getReceiveBufferSize() {
         try {
             return ((KQueueDomainSocketChannel) channel).socket.getReceiveBufferSize();
@@ -196,6 +200,7 @@ public final class KQueueDomainSocketChannelConfig extends KQueueChannelConfig i
         }
     }
 
+    @Override
     public KQueueDomainSocketChannelConfig setReceiveBufferSize(int receiveBufferSize) {
         try {
             ((KQueueDomainSocketChannel) channel).socket.setReceiveBufferSize(receiveBufferSize);

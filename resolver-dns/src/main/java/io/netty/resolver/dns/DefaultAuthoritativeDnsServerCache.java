@@ -16,15 +16,15 @@
 package io.netty.resolver.dns;
 
 import io.netty.channel.EventLoop;
-import io.netty.util.internal.PlatformDependent;
 
 import java.net.InetSocketAddress;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.concurrent.ConcurrentMap;
 
-import static io.netty.util.internal.ObjectUtil.*;
+import static io.netty.util.internal.ObjectUtil.checkPositive;
+import static io.netty.util.internal.ObjectUtil.checkPositiveOrZero;
+import static java.util.Objects.requireNonNull;
 
 /**
  * Default implementation of {@link AuthoritativeDnsServerCache}, backed by a {@link ConcurrentMap}.
@@ -42,16 +42,13 @@ public class DefaultAuthoritativeDnsServerCache implements AuthoritativeDnsServe
 
         @Override
         protected boolean equals(InetSocketAddress entry, InetSocketAddress otherEntry) {
-            if (PlatformDependent.javaVersion() >= 7) {
-                return entry.getHostString().equalsIgnoreCase(otherEntry.getHostString());
-            }
-            return entry.getHostName().equalsIgnoreCase(otherEntry.getHostName());
+            return entry.getHostString().equalsIgnoreCase(otherEntry.getHostString());
         }
 
         @Override
         protected void sortEntries(String hostname, List<InetSocketAddress> entries) {
             if (comparator != null) {
-                Collections.sort(entries, comparator);
+                entries.sort(comparator);
             }
         }
     };
@@ -81,10 +78,9 @@ public class DefaultAuthoritativeDnsServerCache implements AuthoritativeDnsServe
         this.comparator = comparator;
     }
 
-    @SuppressWarnings("unchecked")
     @Override
     public DnsServerAddressStream get(String hostname) {
-        checkNotNull(hostname, "hostname");
+        requireNonNull(hostname, "hostname");
 
         List<? extends InetSocketAddress> addresses = resolveCache.get(hostname);
         if (addresses == null || addresses.isEmpty()) {
@@ -95,11 +91,11 @@ public class DefaultAuthoritativeDnsServerCache implements AuthoritativeDnsServe
 
     @Override
     public void cache(String hostname, InetSocketAddress address, long originalTtl, EventLoop loop) {
-        checkNotNull(hostname, "hostname");
-        checkNotNull(address, "address");
-        checkNotNull(loop, "loop");
+        requireNonNull(hostname, "hostname");
+        requireNonNull(address, "address");
+        requireNonNull(loop, "loop");
 
-        if (PlatformDependent.javaVersion() >= 7 && address.getHostString() == null) {
+        if (address.getHostString() == null) {
             // We only cache addresses that have also a host string as we will need it later when trying to replace
             // unresolved entries in the cache.
             return;
@@ -115,7 +111,9 @@ public class DefaultAuthoritativeDnsServerCache implements AuthoritativeDnsServe
 
     @Override
     public boolean clear(String hostname) {
-        return resolveCache.clear(checkNotNull(hostname, "hostname"));
+        requireNonNull(hostname, "hostname");
+
+        return resolveCache.clear(hostname);
     }
 
     @Override

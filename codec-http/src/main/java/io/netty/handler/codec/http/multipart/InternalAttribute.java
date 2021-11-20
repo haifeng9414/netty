@@ -15,10 +15,11 @@
  */
 package io.netty.handler.codec.http.multipart;
 
+import static java.util.Objects.requireNonNull;
+
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.util.AbstractReferenceCounted;
-import io.netty.util.internal.ObjectUtil;
 
 import java.nio.charset.Charset;
 import java.util.ArrayList;
@@ -29,7 +30,7 @@ import java.util.List;
  * (like Multipart Mixed mode)
  */
 final class InternalAttribute extends AbstractReferenceCounted implements InterfaceHttpData {
-    private final List<ByteBuf> value = new ArrayList<ByteBuf>();
+    private final List<ByteBuf> value = new ArrayList<>();
     private final Charset charset;
     private int size;
 
@@ -43,21 +44,21 @@ final class InternalAttribute extends AbstractReferenceCounted implements Interf
     }
 
     public void addValue(String value) {
-        ObjectUtil.checkNotNull(value, "value");
+        requireNonNull(value, "value");
         ByteBuf buf = Unpooled.copiedBuffer(value, charset);
         this.value.add(buf);
         size += buf.readableBytes();
     }
 
     public void addValue(String value, int rank) {
-        ObjectUtil.checkNotNull(value, "value");
+        requireNonNull(value, "value");
         ByteBuf buf = Unpooled.copiedBuffer(value, charset);
         this.value.add(rank, buf);
         size += buf.readableBytes();
     }
 
     public void setValue(String value, int rank) {
-        ObjectUtil.checkNotNull(value, "value");
+        requireNonNull(value, "value");
         ByteBuf buf = Unpooled.copiedBuffer(value, charset);
         ByteBuf old = this.value.set(rank, buf);
         if (old != null) {

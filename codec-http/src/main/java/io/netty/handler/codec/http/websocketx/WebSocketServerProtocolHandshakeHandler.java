@@ -17,8 +17,8 @@ package io.netty.handler.codec.http.websocketx;
 
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelFutureListener;
+import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
-import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.channel.ChannelPipeline;
 import io.netty.channel.ChannelPromise;
 import io.netty.handler.codec.http.DefaultFullHttpResponse;
@@ -31,30 +31,28 @@ import io.netty.handler.ssl.SslHandler;
 import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.FutureListener;
 
+import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 
 import static io.netty.handler.codec.http.HttpMethod.*;
 import static io.netty.handler.codec.http.HttpResponseStatus.*;
 import static io.netty.handler.codec.http.HttpUtil.*;
 import static io.netty.handler.codec.http.HttpVersion.*;
-import static io.netty.util.internal.ObjectUtil.*;
 
 /**
  * Handles the HTTP handshake (the HTTP Upgrade request) for {@link WebSocketServerProtocolHandler}.
  */
-class WebSocketServerProtocolHandshakeHandler extends ChannelInboundHandlerAdapter {
+class WebSocketServerProtocolHandshakeHandler implements ChannelHandler {
 
     private final WebSocketServerProtocolConfig serverConfig;
-    private ChannelHandlerContext ctx;
     private ChannelPromise handshakePromise;
 
     WebSocketServerProtocolHandshakeHandler(WebSocketServerProtocolConfig serverConfig) {
-        this.serverConfig = checkNotNull(serverConfig, "serverConfig");
+        this.serverConfig = Objects.requireNonNull(serverConfig, "serverConfig");
     }
 
     @Override
     public void handlerAdded(ChannelHandlerContext ctx) {
-        this.ctx = ctx;
         handshakePromise = ctx.newPromise();
     }
 
@@ -86,27 +84,24 @@ class WebSocketServerProtocolHandshakeHandler extends ChannelInboundHandlerAdapt
                 //
                 // See https://github.com/netty/netty/issues/9471.
                 WebSocketServerProtocolHandler.setHandshaker(ctx.channel(), handshaker);
-                ctx.pipeline().remove(this);
 
                 final ChannelFuture handshakeFuture = handshaker.handshake(ctx.channel(), req);
-                handshakeFuture.addListener(new ChannelFutureListener() {
-                    @Override
-                    public void operationComplete(ChannelFuture future) {
-                        if (!future.isSuccess()) {
-                            localHandshakePromise.tryFailure(future.cause());
-                            ctx.fireExceptionCaught(future.cause());
-                        } else {
-                            localHandshakePromise.trySuccess();
-                            // Kept for compatibility
-                            ctx.fireUserEventTriggered(
-                                    WebSocketServerProtocolHandler.ServerHandshakeStateEvent.HANDSHAKE_COMPLETE);
-                            ctx.fireUserEventTriggered(
-                                    new WebSocketServerProtocolHandler.HandshakeComplete(
-                                            req.uri(), req.headers(), handshaker.selectedSubprotocol()));
-                        }
+                handshakeFuture.addListener((ChannelFutureListener) future -> {
+                    if (!future.isSuccess()) {
+                        localHandshakePromise.tryFailure(future.cause());
+                        ctx.fireExceptionCaught(future.cause());
+                    } else {
+                        localHandshakePromise.trySuccess();
+                        // Kept for compatibility
+                        ctx.fireUserEventTriggered(
+                                WebSocketServerProtocolHandler.ServerHandshakeStateEvent.HANDSHAKE_COMPLETE);
+                        ctx.fireUserEventTriggered(
+                                new WebSocketServerProtocolHandler.HandshakeComplete(
+                                        req.uri(), req.headers(), handshaker.selectedSubprotocol()));
                     }
+                    ctx.pipeline().remove(this);
                 });
-                applyHandshakeTimeout();
+                applyHandshakeTimeout(ctx);
             }
         } finally {
             req.release();
@@ -135,31 +130,23 @@ class WebSocketServerProtocolHandshakeHandler extends ChannelInboundHandlerAdapt
         return protocol + "://" + host + path;
     }
 
-    private void applyHandshakeTimeout() {
+    private void applyHandshakeTimeout(ChannelHandlerContext ctx) {
         final ChannelPromise localHandshakePromise = handshakePromise;
         final long handshakeTimeoutMillis = serverConfig.handshakeTimeoutMillis();
         if (handshakeTimeoutMillis <= 0 || localHandshakePromise.isDone()) {
             return;
         }
 
-        final Future<?> timeoutFuture = ctx.executor().schedule(new Runnable() {
-            @Override
-            public void run() {
-                if (!localHandshakePromise.isDone() &&
-                        localHandshakePromise.tryFailure(new WebSocketHandshakeException("handshake timed out"))) {
-                    ctx.flush()
-                       .fireUserEventTriggered(ServerHandshakeStateEvent.HANDSHAKE_TIMEOUT)
-                       .close();
-                }
+        final Future<?> timeoutFuture = ctx.executor().schedule(() -> {
+            if (!localHandshakePromise.isDone() &&
+                    localHandshakePromise.tryFailure(new WebSocketHandshakeException("handshake timed out"))) {
+                ctx.flush()
+                   .fireUserEventTriggered(ServerHandshakeStateEvent.HANDSHAKE_TIMEOUT)
+                   .close();
             }
         }, handshakeTimeoutMillis, TimeUnit.MILLISECONDS);
 
         // Cancel the handshake timeout when handshake is finished.
-        localHandshakePromise.addListener(new FutureListener<Void>() {
-            @Override
-            public void operationComplete(Future<Void> f) {
-                timeoutFuture.cancel(false);
-            }
-        });
+        localHandshakePromise.addListener((FutureListener<Void>) f -> timeoutFuture.cancel(false));
     }
 }

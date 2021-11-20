@@ -25,7 +25,6 @@ import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.channel.socket.DatagramPacket;
 import io.netty.testsuite.transport.TestsuitePermutation;
 import io.netty.testsuite.transport.socket.AbstractDatagramTest;
-import io.netty.util.internal.PlatformDependent;
 import org.junit.Assume;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -35,6 +34,7 @@ import java.net.SocketAddress;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -105,7 +105,7 @@ public class EpollDatagramScatteringReadTest extends AbstractDatagramTest  {
         try {
             cb.handler(new SimpleChannelInboundHandler<Object>() {
                 @Override
-                public void channelRead0(ChannelHandlerContext ctx, Object msgs) throws Exception {
+                public void messageReceived(ChannelHandlerContext ctx, Object msgs) throws Exception {
                     // Nothing will be sent.
                 }
             });
@@ -114,7 +114,7 @@ public class EpollDatagramScatteringReadTest extends AbstractDatagramTest  {
 
             final AtomicReference<Throwable> errorRef = new AtomicReference<Throwable>();
             final byte[] bytes = new byte[packetSize];
-            PlatformDependent.threadLocalRandom().nextBytes(bytes);
+            ThreadLocalRandom.current().nextBytes(bytes);
 
             final CountDownLatch latch = new CountDownLatch(numPackets);
             sb.handler(new SimpleChannelInboundHandler<DatagramPacket>() {
@@ -127,7 +127,7 @@ public class EpollDatagramScatteringReadTest extends AbstractDatagramTest  {
                 }
 
                 @Override
-                protected void channelRead0(ChannelHandlerContext ctx, DatagramPacket msg) {
+                protected void messageReceived(ChannelHandlerContext ctx, DatagramPacket msg) {
                     assertEquals(ccAddress, msg.sender());
 
                     assertEquals(bytes.length, msg.content().readableBytes());
@@ -215,7 +215,7 @@ public class EpollDatagramScatteringReadTest extends AbstractDatagramTest  {
         try {
             cb.handler(new SimpleChannelInboundHandler<Object>() {
                 @Override
-                public void channelRead0(ChannelHandlerContext ctx, Object msgs) {
+                public void messageReceived(ChannelHandlerContext ctx, Object msgs) {
                     // Nothing will be sent.
                 }
             });
@@ -224,13 +224,13 @@ public class EpollDatagramScatteringReadTest extends AbstractDatagramTest  {
 
             final AtomicReference<Throwable> errorRef = new AtomicReference<Throwable>();
             final byte[] bytes = new byte[packetSize];
-            PlatformDependent.threadLocalRandom().nextBytes(bytes);
+            ThreadLocalRandom.current().nextBytes(bytes);
 
             final CountDownLatch latch = new CountDownLatch(1);
             sb.handler(new SimpleChannelInboundHandler<DatagramPacket>() {
 
                 @Override
-                protected void channelRead0(ChannelHandlerContext ctx, DatagramPacket msg) {
+                protected void messageReceived(ChannelHandlerContext ctx, DatagramPacket msg) {
                     assertEquals(ccAddress, msg.sender());
 
                     assertEquals(bytes.length, msg.content().readableBytes());

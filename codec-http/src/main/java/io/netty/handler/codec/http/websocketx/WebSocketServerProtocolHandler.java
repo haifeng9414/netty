@@ -18,8 +18,8 @@ package io.netty.handler.codec.http.websocketx;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFutureListener;
+import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
-import io.netty.channel.ChannelInboundHandler;
 import io.netty.channel.ChannelPipeline;
 import io.netty.handler.codec.http.DefaultFullHttpResponse;
 import io.netty.handler.codec.http.FullHttpResponse;
@@ -27,11 +27,10 @@ import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.util.AttributeKey;
 
-import java.util.List;
+import java.util.Objects;
 
 import static io.netty.handler.codec.http.HttpVersion.HTTP_1_1;
 import static io.netty.handler.codec.http.websocketx.WebSocketServerProtocolConfig.DEFAULT_HANDSHAKE_TIMEOUT_MILLIS;
-import static io.netty.util.internal.ObjectUtil.checkNotNull;
 
 /**
  * This handler does all the heavy lifting for you to run a websocket server.
@@ -46,7 +45,7 @@ import static io.netty.util.internal.ObjectUtil.checkNotNull;
  * to the <tt>io.netty.example.http.websocketx.server.WebSocketServer</tt> example.
  *
  * To know once a handshake was done you can intercept the
- * {@link ChannelInboundHandler#userEventTriggered(ChannelHandlerContext, Object)} and check if the event was instance
+ * {@link ChannelHandler#userEventTriggered(ChannelHandlerContext, Object)} and check if the event was instance
  * of {@link HandshakeComplete}, the event will contain extra information about the handshake such as the request and
  * selected subprotocol.
  */
@@ -110,7 +109,7 @@ public class WebSocketServerProtocolHandler extends WebSocketProtocolHandler {
      *            Server protocol configuration.
      */
     public WebSocketServerProtocolHandler(WebSocketServerProtocolConfig serverConfig) {
-        super(checkNotNull(serverConfig, "serverConfig").dropPongFrames(),
+        super(Objects.requireNonNull(serverConfig, "serverConfig").dropPongFrames(),
               serverConfig.sendCloseFrame(),
               serverConfig.forceCloseTimeoutMillis()
         );
@@ -232,7 +231,7 @@ public class WebSocketServerProtocolHandler extends WebSocketProtocolHandler {
     }
 
     @Override
-    protected void decode(ChannelHandlerContext ctx, WebSocketFrame frame, List<Object> out) throws Exception {
+    protected void decode(ChannelHandlerContext ctx, WebSocketFrame frame) throws Exception {
         if (serverConfig.handleCloseFrames() && frame instanceof CloseWebSocketFrame) {
             WebSocketServerHandshaker handshaker = getHandshaker(ctx.channel());
             if (handshaker != null) {
@@ -243,7 +242,7 @@ public class WebSocketServerProtocolHandler extends WebSocketProtocolHandler {
             }
             return;
         }
-        super.decode(ctx, frame, out);
+        super.decode(ctx, frame);
     }
 
     @Override

@@ -16,7 +16,6 @@
 package io.netty.handler.codec.http.websocketx;
 
 import io.netty.util.AsciiString;
-import io.netty.util.internal.StringUtil;
 
 /**
  * <p>
@@ -28,7 +27,8 @@ import io.netty.util.internal.StringUtil;
  * </p>
  */
 public enum WebSocketVersion {
-    UNKNOWN(AsciiString.cached(StringUtil.EMPTY_STRING)),
+
+    UNKNOWN(AsciiString.cached("unknown")),
 
     /**
      * <a href= "http://tools.ietf.org/html/draft-ietf-hybi-thewebsocketprotocol-00"
@@ -68,10 +68,6 @@ public enum WebSocketVersion {
     }
 
     AsciiString toAsciiString() {
-        if (this == UNKNOWN) {
-            // Let's special case this to preserve behaviour
-            throw new IllegalStateException("Unknown web socket version: " + this);
-        }
         return headerValue;
     }
 }

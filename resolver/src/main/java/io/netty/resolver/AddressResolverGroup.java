@@ -16,11 +16,12 @@
 
 package io.netty.resolver;
 
+import static java.util.Objects.requireNonNull;
+
 import io.netty.util.concurrent.EventExecutor;
 import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.FutureListener;
 import io.netty.util.concurrent.GenericFutureListener;
-import io.netty.util.internal.ObjectUtil;
 import io.netty.util.internal.logging.InternalLogger;
 import io.netty.util.internal.logging.InternalLoggerFactory;
 
@@ -40,11 +41,10 @@ public abstract class AddressResolverGroup<T extends SocketAddress> implements C
     /**
      * Note that we do not use a {@link ConcurrentMap} here because it is usually expensive to instantiate a resolver.
      */
-    private final Map<EventExecutor, AddressResolver<T>> resolvers =
-            new IdentityHashMap<EventExecutor, AddressResolver<T>>();
+    private final Map<EventExecutor, AddressResolver<T>> resolvers = new IdentityHashMap<>();
 
     private final Map<EventExecutor, GenericFutureListener<Future<Object>>> executorTerminationListeners =
-            new IdentityHashMap<EventExecutor, GenericFutureListener<Future<Object>>>();
+            new IdentityHashMap<>();
 
     protected AddressResolverGroup() { }
 
@@ -55,7 +55,7 @@ public abstract class AddressResolverGroup<T extends SocketAddress> implements C
      * {@code #getResolver(EventExecutor)} call with the same {@link EventExecutor}.
      */
     public AddressResolver<T> getResolver(final EventExecutor executor) {
-        ObjectUtil.checkNotNull(executor, "executor");
+        requireNonNull(executor, "executor");
 
         if (executor.isShuttingDown()) {
             throw new IllegalStateException("executor not accepting a task");
@@ -73,18 +73,13 @@ public abstract class AddressResolverGroup<T extends SocketAddress> implements C
                 }
 
                 resolvers.put(executor, newResolver);
-
-                final FutureListener<Object> terminationListener = new FutureListener<Object>() {
-                    @Override
-                    public void operationComplete(Future<Object> future) {
-                        synchronized (resolvers) {
-                            resolvers.remove(executor);
-                            executorTerminationListeners.remove(executor);
-                        }
-                        newResolver.close();
+                FutureListener<Object> terminationListener = future -> {
+                    synchronized (resolvers) {
+                        resolvers.remove(executor);
+                        executorTerminationListeners.remove(executor);
                     }
+                    newResolver.close();
                 };
-
                 executorTerminationListeners.put(executor, terminationListener);
                 executor.terminationFuture().addListener(terminationListener);
 

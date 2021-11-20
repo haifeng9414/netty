@@ -15,14 +15,13 @@
  */
 package io.netty.handler.codec.compression;
 
+import static java.util.Objects.requireNonNull;
+
 import com.jcraft.jzlib.Inflater;
 import com.jcraft.jzlib.JZlib;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.channel.ChannelHandlerContext;
-import io.netty.util.internal.ObjectUtil;
-
-import java.util.List;
 
 public class JZlibDecoder extends ZlibDecoder {
 
@@ -74,7 +73,7 @@ public class JZlibDecoder extends ZlibDecoder {
     public JZlibDecoder(ZlibWrapper wrapper, int maxAllocation) {
         super(maxAllocation);
 
-        ObjectUtil.checkNotNull(wrapper, "wrapper");
+        requireNonNull(wrapper, "wrapper");
 
         int resultCode = z.init(ZlibUtil.convertWrapperType(wrapper));
         if (resultCode != JZlib.Z_OK) {
@@ -106,7 +105,7 @@ public class JZlibDecoder extends ZlibDecoder {
      */
     public JZlibDecoder(byte[] dictionary, int maxAllocation) {
         super(maxAllocation);
-        this.dictionary = ObjectUtil.checkNotNull(dictionary, "dictionary");
+        this.dictionary = requireNonNull(dictionary, "dictionary");
         int resultCode;
         resultCode = z.inflateInit(JZlib.W_ZLIB);
         if (resultCode != JZlib.Z_OK) {
@@ -124,7 +123,7 @@ public class JZlibDecoder extends ZlibDecoder {
     }
 
     @Override
-    protected void decode(ChannelHandlerContext ctx, ByteBuf in, List<Object> out) throws Exception {
+    protected void decode(ChannelHandlerContext ctx, ByteBuf in) throws Exception {
         if (finished) {
             // Skip data received after finished.
             in.skipBytes(in.readableBytes());
@@ -197,7 +196,7 @@ public class JZlibDecoder extends ZlibDecoder {
             } finally {
                 in.skipBytes(z.next_in_index - oldNextInIndex);
                 if (decompressed.isReadable()) {
-                    out.add(decompressed);
+                    ctx.fireChannelRead(decompressed);
                 } else {
                     decompressed.release();
                 }

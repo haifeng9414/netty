@@ -15,15 +15,15 @@
  */
 package io.netty.handler.codec;
 
-import static io.netty.util.internal.ObjectUtil.checkNotNull;
 import static io.netty.util.internal.ObjectUtil.checkPositive;
 import static io.netty.util.internal.ObjectUtil.checkPositiveOrZero;
+import static java.util.Objects.requireNonNull;
 
 import java.nio.ByteOrder;
-import java.util.List;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandlerContext;
+import io.netty.handler.codec.serialization.ObjectDecoder;
 
 /**
  * A decoder that splits the received {@link ByteBuf}s dynamically by the
@@ -301,8 +301,7 @@ public class LengthFieldBasedFrameDecoder extends ByteToMessageDecoder {
     public LengthFieldBasedFrameDecoder(
             ByteOrder byteOrder, int maxFrameLength, int lengthFieldOffset, int lengthFieldLength,
             int lengthAdjustment, int initialBytesToStrip, boolean failFast) {
-
-        this.byteOrder = checkNotNull(byteOrder, "byteOrder");
+        requireNonNull(byteOrder, "byteOrder");
 
         checkPositive(maxFrameLength, "maxFrameLength");
 
@@ -318,20 +317,21 @@ public class LengthFieldBasedFrameDecoder extends ByteToMessageDecoder {
                     "lengthFieldLength (" + lengthFieldLength + ").");
         }
 
+        this.byteOrder = byteOrder;
         this.maxFrameLength = maxFrameLength;
         this.lengthFieldOffset = lengthFieldOffset;
         this.lengthFieldLength = lengthFieldLength;
         this.lengthAdjustment = lengthAdjustment;
-        this.lengthFieldEndOffset = lengthFieldOffset + lengthFieldLength;
+        lengthFieldEndOffset = lengthFieldOffset + lengthFieldLength;
         this.initialBytesToStrip = initialBytesToStrip;
         this.failFast = failFast;
     }
 
     @Override
-    protected final void decode(ChannelHandlerContext ctx, ByteBuf in, List<Object> out) throws Exception {
-        Object decoded = decode(ctx, in);
+    protected final void decode(ChannelHandlerContext ctx, ByteBuf in) throws Exception {
+        Object decoded = decode0(ctx, in);
         if (decoded != null) {
-            out.add(decoded);
+            ctx.fireChannelRead(decoded);
         }
     }
 
@@ -393,7 +393,7 @@ public class LengthFieldBasedFrameDecoder extends ByteToMessageDecoder {
      * @return  frame           the {@link ByteBuf} which represent the frame or {@code null} if no frame could
      *                          be created.
      */
-    protected Object decode(ChannelHandlerContext ctx, ByteBuf in) throws Exception {
+    protected Object decode0(ChannelHandlerContext ctx, ByteBuf in) throws Exception {
         if (discardingTooLongFrame) {
             discardingTooLongFrame(in);
         }

@@ -57,7 +57,7 @@ public class DeflateFrameClientExtensionHandshakerTest {
                 new DeflateFrameClientExtensionHandshaker(false);
 
         WebSocketClientExtension extension = handshaker.handshakeExtension(
-                new WebSocketExtensionData(DEFLATE_FRAME_EXTENSION, Collections.<String, String>emptyMap()));
+                new WebSocketExtensionData(DEFLATE_FRAME_EXTENSION, Collections.emptyMap()));
 
         assertNotNull(extension);
         assertEquals(WebSocketClientExtension.RSV1, extension.rsv());
@@ -71,7 +71,7 @@ public class DeflateFrameClientExtensionHandshakerTest {
         DeflateFrameClientExtensionHandshaker handshaker =
                 new DeflateFrameClientExtensionHandshaker(false);
 
-        Map<String, String> parameters = new HashMap<String, String>();
+        Map<String, String> parameters = new HashMap<>();
         parameters.put("invalid", "12");
 
         // execute

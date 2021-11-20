@@ -15,6 +15,8 @@
  */
 package io.netty.channel.group;
 
+import static java.util.Objects.requireNonNull;
+
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelFutureListener;
@@ -24,7 +26,6 @@ import io.netty.util.concurrent.EventExecutor;
 import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.GenericFutureListener;
 import io.netty.util.concurrent.ImmediateEventExecutor;
-import io.netty.util.internal.ObjectUtil;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -64,10 +65,10 @@ final class DefaultChannelGroupFuture extends DefaultPromise<Void> implements Ch
             if (callSetDone) {
                 if (failureCount > 0) {
                     List<Map.Entry<Channel, Throwable>> failed =
-                            new ArrayList<Map.Entry<Channel, Throwable>>(failureCount);
+                            new ArrayList<>(failureCount);
                     for (ChannelFuture f: futures.values()) {
                         if (!f.isSuccess()) {
-                            failed.add(new DefaultEntry<Channel, Throwable>(f.channel(), f.cause()));
+                            failed.add(new DefaultEntry<>(f.channel(), f.cause()));
                         }
                     }
                     setFailure0(new ChannelGroupException(failed));
@@ -83,10 +84,12 @@ final class DefaultChannelGroupFuture extends DefaultPromise<Void> implements Ch
      */
     DefaultChannelGroupFuture(ChannelGroup group, Collection<ChannelFuture> futures,  EventExecutor executor) {
         super(executor);
-        this.group = ObjectUtil.checkNotNull(group, "group");
-        ObjectUtil.checkNotNull(futures, "futures");
+        requireNonNull(group, "group");
+        requireNonNull(futures, "futures");
 
-        Map<Channel, ChannelFuture> futureMap = new LinkedHashMap<Channel, ChannelFuture>();
+        this.group = group;
+
+        Map<Channel, ChannelFuture> futureMap = new LinkedHashMap<>();
         for (ChannelFuture f: futures) {
             futureMap.put(f.channel(), f);
         }

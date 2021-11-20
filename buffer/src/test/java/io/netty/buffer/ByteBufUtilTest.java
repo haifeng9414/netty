@@ -182,14 +182,14 @@ public class ByteBufUtilTest {
         ByteBuf buf = buffer(2).order(ByteOrder.BIG_ENDIAN);
         ByteBufUtil.writeShortBE(buf, expected);
         assertEquals(expected, buf.readShort());
-        buf.resetReaderIndex();
+        buf.readerIndex(0);
         assertEquals(ByteBufUtil.swapShort((short) expected), buf.readShortLE());
         buf.release();
 
         buf = buffer(2).order(ByteOrder.LITTLE_ENDIAN);
         ByteBufUtil.writeShortBE(buf, expected);
         assertEquals((short) expected, buf.readShortLE());
-        buf.resetReaderIndex();
+        buf.readerIndex(0);
         assertEquals(ByteBufUtil.swapShort((short) expected), buf.readShort());
         buf.release();
     }
@@ -202,14 +202,14 @@ public class ByteBufUtilTest {
         ByteBuf buf = Unpooled.wrappedBuffer(new byte[2]).order(ByteOrder.BIG_ENDIAN);
         ByteBufUtil.setShortBE(buf, 0, shortValue);
         assertEquals(shortValue, buf.readShort());
-        buf.resetReaderIndex();
+        buf.readerIndex(0);
         assertEquals(ByteBufUtil.swapShort((short) shortValue), buf.readShortLE());
         buf.release();
 
         buf = Unpooled.wrappedBuffer(new byte[2]).order(ByteOrder.LITTLE_ENDIAN);
         ByteBufUtil.setShortBE(buf, 0, shortValue);
         assertEquals((short) shortValue, buf.readShortLE());
-        buf.resetReaderIndex();
+        buf.readerIndex(0);
         assertEquals(ByteBufUtil.swapShort((short) shortValue), buf.readShort());
         buf.release();
     }
@@ -222,14 +222,14 @@ public class ByteBufUtilTest {
         ByteBuf buf = buffer(4).order(ByteOrder.BIG_ENDIAN);
         ByteBufUtil.writeMediumBE(buf, mediumValue);
         assertEquals(mediumValue, buf.readMedium());
-        buf.resetReaderIndex();
+        buf.readerIndex(0);
         assertEquals(ByteBufUtil.swapMedium(mediumValue), buf.readMediumLE());
         buf.release();
 
         buf = buffer(4).order(ByteOrder.LITTLE_ENDIAN);
         ByteBufUtil.writeMediumBE(buf, mediumValue);
         assertEquals(mediumValue, buf.readMediumLE());
-        buf.resetReaderIndex();
+        buf.readerIndex(0);
         assertEquals(ByteBufUtil.swapMedium(mediumValue), buf.readMedium());
         buf.release();
     }
@@ -626,34 +626,19 @@ public class ByteBufUtilTest {
 
     @Test
     public void testWriteUtf8InvalidSubsequences() {
-        testInvalidSubsequences(new TestMethod() {
-            @Override
-            public int invoke(Object... args) {
-                return ByteBufUtil.writeUtf8((ByteBuf) args[0], (String) args[1],
-                        (Integer) args[2], (Integer) args[3]);
-            }
-        });
+        testInvalidSubsequences(args -> ByteBufUtil.writeUtf8((ByteBuf) args[0], (String) args[1],
+                (Integer) args[2], (Integer) args[3]));
     }
 
     @Test
     public void testReserveAndWriteUtf8InvalidSubsequences() {
-        testInvalidSubsequences(new TestMethod() {
-            @Override
-            public int invoke(Object... args) {
-                return ByteBufUtil.reserveAndWriteUtf8((ByteBuf) args[0], (String) args[1],
-                        (Integer) args[2], (Integer) args[3], 32);
-            }
-        });
+        testInvalidSubsequences(args -> ByteBufUtil.reserveAndWriteUtf8((ByteBuf) args[0], (String) args[1],
+                (Integer) args[2], (Integer) args[3], 32));
     }
 
     @Test
     public void testUtf8BytesInvalidSubsequences() {
-        testInvalidSubsequences(new TestMethod() {
-            @Override
-            public int invoke(Object... args) {
-                return ByteBufUtil.utf8Bytes((String) args[1], (Integer) args[2], (Integer) args[3]);
-            }
-        });
+        testInvalidSubsequences(args -> ByteBufUtil.utf8Bytes((String) args[1], (Integer) args[2], (Integer) args[3]));
     }
 
     @Test
@@ -824,19 +809,16 @@ public class ByteBufUtilTest {
 
         try {
             final AtomicInteger counter = new AtomicInteger(60000);
-            final AtomicReference<Throwable> errorRef = new AtomicReference<Throwable>();
-            List<Thread> threads = new ArrayList<Thread>();
+            final AtomicReference<Throwable> errorRef = new AtomicReference<>();
+            List<Thread> threads = new ArrayList<>();
             for (int i = 0; i < 10; i++) {
-                Thread thread = new Thread(new Runnable() {
-                    @Override
-                    public void run() {
-                        try {
-                            while (errorRef.get() == null && counter.decrementAndGet() > 0) {
-                                assertTrue(ByteBufUtil.isText(buffer, CharsetUtil.ISO_8859_1));
-                            }
-                        } catch (Throwable cause) {
-                            errorRef.compareAndSet(null, cause);
+                Thread thread = new Thread(() -> {
+                    try {
+                        while (errorRef.get() == null && counter.decrementAndGet() > 0) {
+                            assertTrue(ByteBufUtil.isText(buffer, CharsetUtil.ISO_8859_1));
                         }
+                    } catch (Throwable cause) {
+                        errorRef.compareAndSet(null, cause);
                     }
                 });
                 threads.add(thread);

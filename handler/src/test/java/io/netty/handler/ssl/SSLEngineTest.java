@@ -24,12 +24,13 @@ import io.netty.buffer.Unpooled;
 import io.netty.buffer.UnpooledByteBufAllocator;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
+import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
-import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelPipeline;
+import io.netty.channel.MultithreadEventLoopGroup;
 import io.netty.channel.SimpleChannelInboundHandler;
-import io.netty.channel.nio.NioEventLoopGroup;
+import io.netty.channel.nio.NioHandler;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
@@ -42,11 +43,11 @@ import io.netty.util.NetUtil;
 import io.netty.util.ReferenceCountUtil;
 import io.netty.util.concurrent.ImmediateEventExecutor;
 import io.netty.util.concurrent.UnaryPromiseNotifier;
-import io.netty.util.internal.ResourcesUtil;
 import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.Promise;
 import io.netty.util.internal.EmptyArrays;
 import io.netty.util.internal.PlatformDependent;
+import io.netty.util.internal.ResourcesUtil;
 import io.netty.util.internal.StringUtil;
 import io.netty.util.internal.SystemPropertyUtil;
 import org.conscrypt.OpenSSLProvider;
@@ -58,6 +59,33 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 
+
+import javax.crypto.SecretKey;
+import javax.net.ssl.ExtendedSSLSession;
+import javax.net.ssl.KeyManager;
+import javax.net.ssl.KeyManagerFactorySpi;
+import javax.net.ssl.KeyManagerFactory;
+import javax.net.ssl.ManagerFactoryParameters;
+import javax.net.ssl.SNIHostName;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLEngine;
+import javax.net.ssl.SSLEngineResult;
+import javax.net.ssl.SSLEngineResult.Status;
+import javax.net.ssl.SSLException;
+import javax.net.ssl.SSLHandshakeException;
+import javax.net.ssl.SSLParameters;
+import javax.net.ssl.SSLPeerUnverifiedException;
+import javax.net.ssl.SSLSession;
+import javax.net.ssl.SSLSessionBindingEvent;
+import javax.net.ssl.SSLSessionBindingListener;
+import javax.net.ssl.SSLSocketFactory;
+import javax.net.ssl.TrustManager;
+import javax.net.ssl.TrustManagerFactory;
+import javax.net.ssl.TrustManagerFactorySpi;
+import javax.net.ssl.X509ExtendedKeyManager;
+import javax.net.ssl.X509ExtendedTrustManager;
+import javax.net.ssl.X509TrustManager;
+import javax.security.cert.X509Certificate;
 import java.io.ByteArrayInputStream;
 import java.io.Closeable;
 import java.io.File;
@@ -83,41 +111,23 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
-import javax.crypto.SecretKey;
-import javax.net.ssl.ExtendedSSLSession;
-import javax.net.ssl.KeyManager;
-import javax.net.ssl.KeyManagerFactory;
-import javax.net.ssl.KeyManagerFactorySpi;
-import javax.net.ssl.ManagerFactoryParameters;
-import javax.net.ssl.SNIHostName;
-import javax.net.ssl.SSLContext;
-import javax.net.ssl.SSLEngine;
-import javax.net.ssl.SSLEngineResult;
-import javax.net.ssl.SSLEngineResult.Status;
-import javax.net.ssl.SSLException;
-import javax.net.ssl.SSLHandshakeException;
-import javax.net.ssl.SSLParameters;
-import javax.net.ssl.SSLPeerUnverifiedException;
-import javax.net.ssl.SSLSession;
-import javax.net.ssl.SSLSessionBindingEvent;
-import javax.net.ssl.SSLSessionBindingListener;
-import javax.net.ssl.SSLSocketFactory;
-import javax.net.ssl.TrustManager;
-import javax.net.ssl.TrustManagerFactory;
-import javax.net.ssl.TrustManagerFactorySpi;
-import javax.net.ssl.X509ExtendedKeyManager;
-import javax.net.ssl.X509ExtendedTrustManager;
-import javax.net.ssl.X509TrustManager;
-import javax.security.cert.X509Certificate;
-
-import static io.netty.handler.ssl.SslUtils.*;
+import static io.netty.handler.ssl.SslUtils.PROTOCOL_SSL_V2;
+import static io.netty.handler.ssl.SslUtils.PROTOCOL_SSL_V2_HELLO;
+import static io.netty.handler.ssl.SslUtils.PROTOCOL_SSL_V3;
+import static io.netty.handler.ssl.SslUtils.PROTOCOL_TLS_V1;
+import static io.netty.handler.ssl.SslUtils.PROTOCOL_TLS_V1_1;
+import static io.netty.handler.ssl.SslUtils.PROTOCOL_TLS_V1_2;
+import static io.netty.handler.ssl.SslUtils.PROTOCOL_TLS_V1_3;
+import static io.netty.handler.ssl.SslUtils.SSL_RECORD_HEADER_LENGTH;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -230,7 +240,7 @@ public abstract class SSLEngineTest {
         }
 
         @Override
-        protected void channelRead0(ChannelHandlerContext ctx, ByteBuf msg) throws Exception {
+        protected void messageReceived(ChannelHandlerContext ctx, ByteBuf msg) throws Exception {
             receiver.messageReceived(msg);
             latch.countDown();
         }
@@ -290,7 +300,7 @@ public abstract class SSLEngineTest {
             case Heap:
                 return ByteBuffer.allocate(len);
             case Mixed:
-                return PlatformDependent.threadLocalRandom().nextBoolean() ?
+                return ThreadLocalRandom.current().nextBoolean() ?
                         ByteBuffer.allocateDirect(len) : ByteBuffer.allocate(len);
             default:
                 throw new Error();
@@ -315,7 +325,7 @@ public abstract class SSLEngineTest {
                 case Heap:
                     return allocator.heapBuffer();
                 case Mixed:
-                    return PlatformDependent.threadLocalRandom().nextBoolean() ?
+                    return ThreadLocalRandom.current().nextBoolean() ?
                             allocator.directBuffer() : allocator.heapBuffer();
                 default:
                     throw new Error();
@@ -330,7 +340,7 @@ public abstract class SSLEngineTest {
                 case Heap:
                     return allocator.heapBuffer(initialCapacity);
                 case Mixed:
-                    return PlatformDependent.threadLocalRandom().nextBoolean() ?
+                    return ThreadLocalRandom.current().nextBoolean() ?
                             allocator.directBuffer(initialCapacity) : allocator.heapBuffer(initialCapacity);
                 default:
                     throw new Error();
@@ -345,7 +355,7 @@ public abstract class SSLEngineTest {
                 case Heap:
                     return allocator.heapBuffer(initialCapacity, maxCapacity);
                 case Mixed:
-                    return PlatformDependent.threadLocalRandom().nextBoolean() ?
+                    return ThreadLocalRandom.current().nextBoolean() ?
                             allocator.directBuffer(initialCapacity, maxCapacity) :
                             allocator.heapBuffer(initialCapacity, maxCapacity);
                 default:
@@ -406,7 +416,7 @@ public abstract class SSLEngineTest {
                 case Heap:
                     return allocator.compositeHeapBuffer();
                 case Mixed:
-                    return PlatformDependent.threadLocalRandom().nextBoolean() ?
+                    return ((Random) ThreadLocalRandom.current()).nextBoolean() ?
                             allocator.compositeDirectBuffer() :
                             allocator.compositeHeapBuffer();
                 default:
@@ -422,7 +432,7 @@ public abstract class SSLEngineTest {
                 case Heap:
                     return allocator.compositeHeapBuffer(maxNumComponents);
                 case Mixed:
-                    return PlatformDependent.threadLocalRandom().nextBoolean() ?
+                    return ((Random) ThreadLocalRandom.current()).nextBoolean() ?
                             allocator.compositeDirectBuffer(maxNumComponents) :
                             allocator.compositeHeapBuffer(maxNumComponents);
                 default:
@@ -727,7 +737,8 @@ public abstract class SSLEngineTest {
         sb = new ServerBootstrap();
         cb = new Bootstrap();
 
-        sb.group(new NioEventLoopGroup(), new NioEventLoopGroup());
+        sb.group(new MultithreadEventLoopGroup(NioHandler.newFactory()),
+                new MultithreadEventLoopGroup(NioHandler.newFactory()));
         sb.channel(NioServerSocketChannel.class);
         sb.childHandler(new ChannelInitializer<Channel>() {
             @Override
@@ -742,7 +753,7 @@ public abstract class SSLEngineTest {
                 }
                 p.addLast(handler);
                 p.addLast(new MessageDelegatorChannelHandler(serverReceiver, serverLatch));
-                p.addLast(new ChannelInboundHandlerAdapter() {
+                p.addLast(new ChannelHandler() {
                     @Override
                     public void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws Exception {
                         if (evt == SslHandshakeCompletionEvent.SUCCESS) {
@@ -772,7 +783,7 @@ public abstract class SSLEngineTest {
             }
         });
 
-        cb.group(new NioEventLoopGroup());
+        cb.group(new MultithreadEventLoopGroup(NioHandler.newFactory()));
         cb.channel(NioSocketChannel.class);
         cb.handler(new ChannelInitializer<Channel>() {
             @Override
@@ -784,7 +795,7 @@ public abstract class SSLEngineTest {
                         clientSslCtx.newHandler(ch.alloc(), delegatingExecutor);
                 p.addLast(handler);
                 p.addLast(new MessageDelegatorChannelHandler(clientReceiver, clientLatch));
-                p.addLast(new ChannelInboundHandlerAdapter() {
+                p.addLast(new ChannelHandler() {
                     @Override
                     public void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws Exception {
                         if (evt == SslHandshakeCompletionEvent.SUCCESS) {
@@ -884,7 +895,8 @@ public abstract class SSLEngineTest {
         sb = new ServerBootstrap();
         cb = new Bootstrap();
 
-        sb.group(new NioEventLoopGroup(), new NioEventLoopGroup());
+        sb.group(new MultithreadEventLoopGroup(NioHandler.newFactory()),
+                new MultithreadEventLoopGroup(NioHandler.newFactory()));
         sb.channel(NioServerSocketChannel.class);
         sb.childHandler(new ChannelInitializer<Channel>() {
             @Override
@@ -896,7 +908,7 @@ public abstract class SSLEngineTest {
                         serverSslCtx.newHandler(ch.alloc(), delegatingExecutor);
                 p.addLast(handler);
                 p.addLast(new MessageDelegatorChannelHandler(serverReceiver, serverLatch));
-                p.addLast(new ChannelInboundHandlerAdapter() {
+                p.addLast(new ChannelHandler() {
                     @Override
                     public void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws Exception {
                         if (evt == SslHandshakeCompletionEvent.SUCCESS) {
@@ -927,7 +939,7 @@ public abstract class SSLEngineTest {
         });
 
         final Promise<Void> clientWritePromise = ImmediateEventExecutor.INSTANCE.newPromise();
-        cb.group(new NioEventLoopGroup());
+        cb.group(new MultithreadEventLoopGroup(NioHandler.newFactory()));
         cb.channel(NioSocketChannel.class);
         cb.handler(new ChannelInitializer<Channel>() {
             @Override
@@ -949,7 +961,7 @@ public abstract class SSLEngineTest {
                 sslHandler.engine().setSSLParameters(parameters);
                 p.addLast(sslHandler);
                 p.addLast(new MessageDelegatorChannelHandler(clientReceiver, clientLatch));
-                p.addLast(new ChannelInboundHandlerAdapter() {
+                p.addLast(new ChannelHandler() {
                     @Override
                     public void handlerAdded(ChannelHandlerContext ctx) {
                         // Only write if there is a failure expected. We don't actually care about the write going
@@ -1071,7 +1083,8 @@ public abstract class SSLEngineTest {
         sb = new ServerBootstrap();
         cb = new Bootstrap();
 
-        sb.group(new NioEventLoopGroup(), new NioEventLoopGroup());
+        sb.group(new MultithreadEventLoopGroup(NioHandler.newFactory()),
+                new MultithreadEventLoopGroup(NioHandler.newFactory()));
         sb.channel(NioServerSocketChannel.class);
         sb.childHandler(new ChannelInitializer<Channel>() {
             @Override
@@ -1085,7 +1098,7 @@ public abstract class SSLEngineTest {
 
                 p.addLast(new SslHandler(engine));
                 p.addLast(new MessageDelegatorChannelHandler(serverReceiver, serverLatch));
-                p.addLast(new ChannelInboundHandlerAdapter() {
+                p.addLast(new ChannelHandler() {
                     @Override
                     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
                         if (cause.getCause() instanceof SSLHandshakeException) {
@@ -1113,7 +1126,7 @@ public abstract class SSLEngineTest {
             }
         });
 
-        cb.group(new NioEventLoopGroup());
+        cb.group(new MultithreadEventLoopGroup(NioHandler.newFactory()));
         cb.channel(NioSocketChannel.class);
         cb.handler(new ChannelInitializer<Channel>() {
             @Override
@@ -1128,7 +1141,7 @@ public abstract class SSLEngineTest {
                 ChannelPipeline p = ch.pipeline();
                 p.addLast(handler);
                 p.addLast(new MessageDelegatorChannelHandler(clientReceiver, clientLatch));
-                p.addLast(new ChannelInboundHandlerAdapter() {
+                p.addLast(new ChannelHandler() {
                     @Override
                     public void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws Exception {
                         if (evt == SslHandshakeCompletionEvent.SUCCESS) {
@@ -1197,7 +1210,7 @@ public abstract class SSLEngineTest {
         try {
             assertTrue(sendChannel.writeAndFlush(message).await(5, TimeUnit.SECONDS));
             receiverLatch.await(5, TimeUnit.SECONDS);
-            message.resetReaderIndex();
+            message.readerIndex(0);
             ArgumentCaptor<ByteBuf> captor = ArgumentCaptor.forClass(ByteBuf.class);
             verify(receiver).messageReceived(captor.capture());
             dataCapture = captor.getAllValues();
@@ -1310,7 +1323,7 @@ public abstract class SSLEngineTest {
                                         .ciphers(ciphers())
                                         .build());
         sb = new ServerBootstrap()
-                .group(new NioEventLoopGroup(1))
+                .group(new MultithreadEventLoopGroup(1, NioHandler.newFactory()))
                 .channel(NioServerSocketChannel.class)
                 .childHandler(new ChannelInitializer<SocketChannel>() {
                     @Override
@@ -1324,7 +1337,7 @@ public abstract class SSLEngineTest {
                                 serverSslCtx.newHandler(ch.alloc(), delegatingExecutor);
 
                         p.addLast(handler);
-                        p.addLast(new ChannelInboundHandlerAdapter() {
+                        p.addLast(new ChannelHandler() {
                             @Override
                             public void userEventTriggered(ChannelHandlerContext ctx, Object evt) {
                                 if (evt instanceof SslHandshakeCompletionEvent &&
@@ -1343,11 +1356,8 @@ public abstract class SSLEngineTest {
                                 // The server then attempts to trigger a flush operation once the application data is
                                 // received from the client. The flush will encrypt all data and should not result in
                                 // deadlock.
-                                ctx.channel().eventLoop().schedule(new Runnable() {
-                                    @Override
-                                    public void run() {
-                                        ctx.writeAndFlush(ctx.alloc().buffer(1).writeByte(101));
-                                    }
+                                ctx.channel().eventLoop().schedule(() -> {
+                                    ctx.writeAndFlush(ctx.alloc().buffer(1).writeByte(101));
                                 }, 500, TimeUnit.MILLISECONDS);
                             }
 
@@ -1371,7 +1381,7 @@ public abstract class SSLEngineTest {
                                         .build());
 
         cb = new Bootstrap();
-        cb.group(new NioEventLoopGroup(1))
+        cb.group(new MultithreadEventLoopGroup(1, NioHandler.newFactory()))
                 .channel(NioSocketChannel.class)
                 .handler(new ChannelInitializer<SocketChannel>() {
                     @Override
@@ -1388,7 +1398,7 @@ public abstract class SSLEngineTest {
                         // the unit test can terminate relativley quicly.
                         sslHandler.setHandshakeTimeout(1, TimeUnit.SECONDS);
                         p.addLast(sslHandler);
-                        p.addLast(new ChannelInboundHandlerAdapter() {
+                        p.addLast(new ChannelHandler() {
                             private int handshakeCount;
                             @Override
                             public void userEventTriggered(ChannelHandlerContext ctx, Object evt) {
@@ -1671,7 +1681,8 @@ public abstract class SSLEngineTest {
         sb = new ServerBootstrap();
         cb = new Bootstrap();
 
-        sb.group(new NioEventLoopGroup(), new NioEventLoopGroup());
+        sb.group(new MultithreadEventLoopGroup(NioHandler.newFactory()),
+                new MultithreadEventLoopGroup(NioHandler.newFactory()));
         sb.channel(NioServerSocketChannel.class);
         sb.childHandler(new ChannelInitializer<Channel>() {
             @Override
@@ -1686,7 +1697,7 @@ public abstract class SSLEngineTest {
 
                 p.addLast(sslHandler);
                 p.addLast(new MessageDelegatorChannelHandler(serverReceiver, serverLatch));
-                p.addLast(new ChannelInboundHandlerAdapter() {
+                p.addLast(new ChannelHandler() {
                     @Override
                     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
                         if (cause.getCause() instanceof SSLHandshakeException) {
@@ -1701,7 +1712,7 @@ public abstract class SSLEngineTest {
             }
         });
 
-        cb.group(new NioEventLoopGroup());
+        cb.group(new MultithreadEventLoopGroup(NioHandler.newFactory()));
         cb.channel(NioSocketChannel.class);
         cb.handler(new ChannelInitializer<Channel>() {
             @Override
@@ -1716,7 +1727,7 @@ public abstract class SSLEngineTest {
 
                 p.addLast(sslHandler);
                 p.addLast(new MessageDelegatorChannelHandler(clientReceiver, clientLatch));
-                p.addLast(new ChannelInboundHandlerAdapter() {
+                p.addLast(new ChannelHandler() {
                     @Override
                     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
                         if (cause.getCause() instanceof SSLHandshakeException) {
@@ -1755,7 +1766,8 @@ public abstract class SSLEngineTest {
                                  .ciphers(ciphers()).build());
 
         sb = new ServerBootstrap();
-        sb.group(new NioEventLoopGroup(), new NioEventLoopGroup());
+        sb.group(new MultithreadEventLoopGroup(NioHandler.newFactory()),
+                new MultithreadEventLoopGroup(NioHandler.newFactory()));
         sb.channel(NioServerSocketChannel.class);
 
         final Promise<String> promise = sb.config().group().next().newPromise();
@@ -1769,7 +1781,7 @@ public abstract class SSLEngineTest {
                         serverSslCtx.newHandler(ch.alloc(), delegatingExecutor);
 
                 ch.pipeline().addFirst(sslHandler);
-                ch.pipeline().addLast(new ChannelInboundHandlerAdapter() {
+                ch.pipeline().addLast(new ChannelHandler() {
                     @Override
                     public void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws Exception {
                         if (evt instanceof SslHandshakeCompletionEvent) {
@@ -1832,7 +1844,7 @@ public abstract class SSLEngineTest {
                 .sslContextProvider(clientSslContextProvider())
                 .protocols(protocols()).ciphers(ciphers()).build());
         cb = new Bootstrap();
-        cb.group(new NioEventLoopGroup());
+        cb.group(new MultithreadEventLoopGroup(NioHandler.newFactory()));
         cb.channel(NioSocketChannel.class);
         clientChannel = cb.handler(new ChannelInitializer<Channel>() {
             @Override
@@ -2744,10 +2756,10 @@ public abstract class SSLEngineTest {
         SSLEngine server = wrapEngine(ctx.newEngine(UnpooledByteBufAllocator.DEFAULT));
 
         try {
-            Set<String> supported = new HashSet<String>(Arrays.asList(server.getSupportedProtocols()));
+            Set<String> supported = new HashSet<>(Arrays.asList(server.getSupportedProtocols()));
             if (supported.contains(protocol)) {
                 server.setEnabledProtocols(server.getSupportedProtocols());
-                assertEquals(supported, new HashSet<String>(Arrays.asList(server.getSupportedProtocols())));
+                assertEquals(supported, new HashSet<>(Arrays.asList(server.getSupportedProtocols())));
 
                 for (String disabled : disabledProtocols) {
                     supported.remove(disabled);
@@ -2757,7 +2769,7 @@ public abstract class SSLEngineTest {
                     return;
                 }
                 server.setEnabledProtocols(supported.toArray(new String[0]));
-                assertEquals(supported, new HashSet<String>(Arrays.asList(server.getEnabledProtocols())));
+                assertEquals(supported, new HashSet<>(Arrays.asList(server.getEnabledProtocols())));
                 server.setEnabledProtocols(server.getSupportedProtocols());
             }
         } finally {
@@ -2842,7 +2854,7 @@ public abstract class SSLEngineTest {
     @Test
     public void testInvalidCipher() throws Exception {
         SelfSignedCertificate cert = new SelfSignedCertificate();
-        List<String> cipherList = new ArrayList<String>();
+        List<String> cipherList = new ArrayList<>();
         Collections.addAll(cipherList, ((SSLSocketFactory) SSLSocketFactory.getDefault()).getDefaultCipherSuites());
         cipherList.add("InvalidCipher");
         SSLEngine server = null;
@@ -3503,7 +3515,8 @@ public abstract class SSLEngineTest {
 
         try {
             sb = new ServerBootstrap();
-            sb.group(new NioEventLoopGroup(), new NioEventLoopGroup());
+            sb.group(new MultithreadEventLoopGroup(NioHandler.newFactory()),
+                    new MultithreadEventLoopGroup(NioHandler.newFactory()));
             sb.channel(NioServerSocketChannel.class);
 
             final Promise<SecretKey> promise = sb.config().group().next().newPromise();

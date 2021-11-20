@@ -19,6 +19,7 @@ import io.netty.channel.Channel;
 import io.netty.channel.ChannelConfig;
 import io.netty.channel.ChannelOutboundBuffer;
 import io.netty.channel.ChannelPipeline;
+import io.netty.channel.EventLoop;
 import io.netty.channel.RecvByteBufAllocator;
 import io.netty.channel.ServerChannel;
 
@@ -36,10 +37,10 @@ public abstract class AbstractNioMessageChannel extends AbstractNioChannel {
     boolean inputShutdown;
 
     /**
-     * @see AbstractNioChannel#AbstractNioChannel(Channel, SelectableChannel, int)
+     * @see AbstractNioChannel#AbstractNioChannel(Channel, EventLoop, SelectableChannel, int)
      */
-    protected AbstractNioMessageChannel(Channel parent, SelectableChannel ch, int readInterestOp) {
-        super(parent, ch, readInterestOp);
+    protected AbstractNioMessageChannel(Channel parent, EventLoop eventLoop, SelectableChannel ch, int readInterestOp) {
+        super(parent, eventLoop, ch, readInterestOp);
     }
 
     @Override
@@ -57,7 +58,7 @@ public abstract class AbstractNioMessageChannel extends AbstractNioChannel {
 
     private final class NioMessageUnsafe extends AbstractNioUnsafe {
 
-        private final List<Object> readBuf = new ArrayList<Object>();
+        private final List<Object> readBuf = new ArrayList<>();
 
         @Override
         public void read() {
@@ -107,6 +108,8 @@ public abstract class AbstractNioMessageChannel extends AbstractNioChannel {
                     if (isOpen()) {
                         close(voidPromise());
                     }
+                } else {
+                    readIfIsAutoRead();
                 }
             } finally {
                 // Check if there is a readPending which was not processed yet.
@@ -125,6 +128,9 @@ public abstract class AbstractNioMessageChannel extends AbstractNioChannel {
     @Override
     protected void doWrite(ChannelOutboundBuffer in) throws Exception {
         final SelectionKey key = selectionKey();
+        if (key == null) {
+            return;
+        }
         final int interestOps = key.interestOps();
 
         for (;;) {

@@ -18,11 +18,12 @@ package io.netty.handler.ssl;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.Channel;
+import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
-import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.EventLoopGroup;
-import io.netty.channel.nio.NioEventLoopGroup;
+import io.netty.channel.MultithreadEventLoopGroup;
+import io.netty.channel.nio.NioHandler;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.handler.logging.LogLevel;
@@ -51,7 +52,6 @@ import java.security.cert.CertificateException;
 import java.security.cert.CertificateExpiredException;
 import java.security.cert.CertificateNotYetValidException;
 import java.security.cert.CertificateRevokedException;
-import java.security.cert.Extension;
 import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -68,8 +68,8 @@ public class SslErrorTest {
     @Parameterized.Parameters(
             name = "{index}: serverProvider = {0}, clientProvider = {1}, exception = {2}, serverProduceError = {3}")
     public static Collection<Object[]> data() {
-        List<SslProvider> serverProviders = new ArrayList<SslProvider>(2);
-        List<SslProvider> clientProviders = new ArrayList<SslProvider>(3);
+        List<SslProvider> serverProviders = new ArrayList<>(2);
+        List<SslProvider> clientProviders = new ArrayList<>(3);
 
         if (OpenSsl.isAvailable()) {
             serverProviders.add(SslProvider.OPENSSL);
@@ -81,19 +81,19 @@ public class SslErrorTest {
         // alert all the time, sigh.....
         clientProviders.add(SslProvider.JDK);
 
-        List<CertificateException> exceptions = new ArrayList<CertificateException>(6);
+        List<CertificateException> exceptions = new ArrayList<>(6);
         exceptions.add(new CertificateExpiredException());
         exceptions.add(new CertificateNotYetValidException());
         exceptions.add(new CertificateRevokedException(
                 new Date(), CRLReason.AA_COMPROMISE, new X500Principal(""),
-                Collections.<String, Extension>emptyMap()));
+                Collections.emptyMap()));
 
         // Also use wrapped exceptions as this is what the JDK implementation of X509TrustManagerFactory is doing.
         exceptions.add(newCertificateException(CertPathValidatorException.BasicReason.EXPIRED));
         exceptions.add(newCertificateException(CertPathValidatorException.BasicReason.NOT_YET_VALID));
         exceptions.add(newCertificateException(CertPathValidatorException.BasicReason.REVOKED));
 
-        List<Object[]> params = new ArrayList<Object[]>();
+        List<Object[]> params = new ArrayList<>();
         for (SslProvider serverProvider: serverProviders) {
             for (SslProvider clientProvider: clientProviders) {
                 for (CertificateException exception: exceptions) {
@@ -152,7 +152,7 @@ public class SslErrorTest {
 
         Channel serverChannel = null;
         Channel clientChannel = null;
-        EventLoopGroup group = new NioEventLoopGroup();
+        EventLoopGroup group = new MultithreadEventLoopGroup(NioHandler.newFactory());
         final Promise<Void> promise = group.next().newPromise();
         try {
             serverChannel = new ServerBootstrap().group(group)
@@ -165,7 +165,7 @@ public class SslErrorTest {
                             if (!serverProduceError) {
                                 ch.pipeline().addLast(new AlertValidationHandler(promise));
                             }
-                            ch.pipeline().addLast(new ChannelInboundHandlerAdapter() {
+                            ch.pipeline().addLast(new ChannelHandler() {
 
                                 @Override
                                 public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
@@ -181,10 +181,11 @@ public class SslErrorTest {
                         @Override
                         protected void initChannel(Channel ch) {
                             ch.pipeline().addLast(sslClientCtx.newHandler(ch.alloc()));
+
                             if (serverProduceError) {
                                 ch.pipeline().addLast(new AlertValidationHandler(promise));
                             }
-                            ch.pipeline().addLast(new ChannelInboundHandlerAdapter() {
+                            ch.pipeline().addLast(new ChannelHandler() {
 
                                 @Override
                                 public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
@@ -239,7 +240,7 @@ public class SslErrorTest {
         }
     }
 
-    private final class AlertValidationHandler extends ChannelInboundHandlerAdapter {
+    private final class AlertValidationHandler implements ChannelHandler {
         private final Promise<Void> promise;
 
         AlertValidationHandler(Promise<Void> promise) {

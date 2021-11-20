@@ -106,7 +106,6 @@ public final class Native {
     public static native void eventFdWrite(int fd, long value);
     public static native void eventFdRead(int fd);
     static native void timerFdRead(int fd);
-    static native void timerFdSetTime(int fd, int sec, int nsec) throws IOException;
 
     public static FileDescriptor newEpollCreate() {
         return new FileDescriptor(epollCreate());
@@ -120,15 +119,6 @@ public final class Native {
     @Deprecated
     public static int epollWait(FileDescriptor epollFd, EpollEventArray events, FileDescriptor timerFd,
                                 int timeoutSec, int timeoutNs) throws IOException {
-        if (timeoutSec == 0 && timeoutNs == 0) {
-            // Zero timeout => poll (aka return immediately)
-            return epollWait(epollFd, events, 0);
-        }
-        if (timeoutSec == Integer.MAX_VALUE) {
-            // Max timeout => wait indefinitely: disarm timerfd first
-            timeoutSec = 0;
-            timeoutNs = 0;
-        }
         int ready = epollWait0(epollFd.intValue(), events.memoryAddress(), events.length(), timerFd.intValue(),
                                timeoutSec, timeoutNs);
         if (ready < 0) {
@@ -192,17 +182,6 @@ public final class Native {
         }
     }
     private static native int epollCtlDel0(int efd, int fd);
-
-    // File-descriptor operations
-    public static int splice(int fd, long offIn, int fdOut, long offOut, long len) throws IOException {
-        int res = splice0(fd, offIn, fdOut, offOut, len);
-        if (res >= 0) {
-            return res;
-        }
-        return ioResult("splice", res);
-    }
-
-    private static native int splice0(int fd, long offIn, int fdOut, long offOut, long len);
 
     @Deprecated
     public static int sendmmsg(int fd, NativeDatagramPacketArray.NativeDatagramPacket[] msgs,

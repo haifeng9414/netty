@@ -17,11 +17,11 @@ package io.netty.example.socksproxy;
 
 import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
+import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
-import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.util.ReferenceCountUtil;
 
-public final class RelayHandler extends ChannelInboundHandlerAdapter {
+public final class RelayHandler implements ChannelHandler {
 
     private final Channel relayChannel;
 

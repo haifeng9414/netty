@@ -26,7 +26,7 @@
   <groupId>io.netty</groupId>
   <artifactId>netty-parent</artifactId>
   <packaging>pom</packaging>
-  <version>4.1.53.Final-SNAPSHOT</version>
+  <version>5.0.0.Final-SNAPSHOT</version>
 
   <name>Netty</name>
   <url>https://netty.io/</url>
@@ -94,7 +94,7 @@
       <properties>
         <skipNativeImageTestsuite>false</skipNativeImageTestsuite>
         <forbiddenapis.skip>true</forbiddenapis.skip>
-        <testJvm />
+        <testJvm/>
       </properties>
     </profile>
     <!-- JDK15 -->
@@ -132,9 +132,6 @@
         <enforcer.plugin.version>3.0.0-M3</enforcer.plugin.version>
         <!-- 1.4.x does not work in Java10+ -->
         <jboss.marshalling.version>2.0.5.Final</jboss.marshalling.version>
-        <!-- This is the minimum supported by Java12+ -->
-        <maven.compiler.source>1.7</maven.compiler.source>
-        <maven.compiler.target>1.7</maven.compiler.target>
         <!-- pax-exam does not work on latest Java12 EA 22 build -->
         <skipOsgiTestsuite>true</skipOsgiTestsuite>
       </properties>
@@ -153,9 +150,6 @@
         <enforcer.plugin.version>3.0.0-M3</enforcer.plugin.version>
         <!-- 1.4.x does not work in Java10+ -->
         <jboss.marshalling.version>2.0.5.Final</jboss.marshalling.version>
-        <!-- This is the minimum supported by Java12+ -->
-        <maven.compiler.source>1.7</maven.compiler.source>
-        <maven.compiler.target>1.7</maven.compiler.target>
         <!-- pax-exam does not work on latest Java12 EA 22 build -->
         <skipOsgiTestsuite>true</skipOsgiTestsuite>
       </properties>
@@ -178,9 +172,6 @@
         <enforcer.plugin.version>3.0.0-M3</enforcer.plugin.version>
         <!-- 1.4.x does not work in Java10+ -->
         <jboss.marshalling.version>2.0.5.Final</jboss.marshalling.version>
-        <!-- This is the minimum supported by Java12+ -->
-        <maven.compiler.source>1.7</maven.compiler.source>
-        <maven.compiler.target>1.7</maven.compiler.target>
         <!-- pax-exam does not work on latest Java12 EA 22 build -->
         <skipOsgiTestsuite>true</skipOsgiTestsuite>
       </properties>
@@ -328,8 +319,8 @@
   </profiles>
 
   <properties>
-    <maven.compiler.source>1.6</maven.compiler.source>
-    <maven.compiler.target>1.6</maven.compiler.target>
+    <maven.compiler.source>1.8</maven.compiler.source>
+    <maven.compiler.target>1.8</maven.compiler.target>
     <netty.dev.tools.directory>${project.build.directory}/dev-tools</netty.dev.tools.directory>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
@@ -372,7 +363,8 @@
     <skipOsgiTestsuite>false</skipOsgiTestsuite>
     <skipAutobahnTestsuite>false</skipAutobahnTestsuite>
     <skipHttp2Testsuite>false</skipHttp2Testsuite>
-    <skipJapicmp>false</skipJapicmp>
+    <!-- Skip for now as we have no version released yet of netty 5 -->
+    <skipJapicmp>true</skipJapicmp>
     <graalvm.version>19.0.0</graalvm.version>
     <!-- By default skip native testsuite as it requires a custom environment with graalvm installed -->
     <skipNativeImageTestsuite>true</skipNativeImageTestsuite>
@@ -405,9 +397,7 @@
     <module>transport-native-unix-common</module>
     <module>transport-native-epoll</module>
     <module>transport-native-kqueue</module>
-    <module>transport-rxtx</module>
     <module>transport-sctp</module>
-    <module>transport-udt</module>
     <module>handler</module>
     <module>handler-proxy</module>
     <module>example</module>
@@ -420,7 +410,6 @@
     <module>transport-blockhound-tests</module>
     <module>microbench</module>
     <module>bom</module>
-    <module>demo</module>
   </modules>
 
   <dependencyManagement>
@@ -550,18 +539,6 @@
         <groupId>org.jctools</groupId>
         <artifactId>jctools-core</artifactId>
         <version>3.1.0</version>
-      </dependency>
-
-      <dependency>
-        <groupId>org.rxtx</groupId>
-        <artifactId>rxtx</artifactId>
-        <version>2.1.7</version>
-      </dependency>
-
-      <dependency>
-        <groupId>com.barchart.udt</groupId>
-        <artifactId>barchart-udt-bundle</artifactId>
-        <version>2.3.0</version>
       </dependency>
 
       <dependency>
@@ -852,11 +829,18 @@
         <configuration>
           <signature>
             <groupId>org.codehaus.mojo.signature</groupId>
-            <artifactId>java16</artifactId>
-            <version>1.1</version>
+            <artifactId>java18</artifactId>
+            <version>1.0</version>
           </signature>
           <ignores>
-            <ignore>java.nio.ByteBuffer</ignore>
+            <!--
+            We need to whitelist MethodHandle as animal-sniffer can not handle it correctly
+            https://github.com/mojohaus/animal-sniffer/issues/67
+            -->
+            <ignore>java.lang.invoke.MethodHandle</ignore>
+            <ignore>sun.misc.Unsafe</ignore>
+            <ignore>sun.misc.Cleaner</ignore>
+            <ignore>sun.nio.ch.DirectBuffer</ignore>
           </ignores>
           <annotations>
             <annotation>io.netty.util.internal.SuppressJava6Requirement</annotation>
@@ -874,9 +858,6 @@
       <plugin>
         <artifactId>maven-checkstyle-plugin</artifactId>
         <version>3.1.0</version>
-        <configuration>
-          <skip>true</skip>
-        </configuration>
         <executions>
           <execution>
             <id>check-style</id>
@@ -924,7 +905,6 @@
           </execution>
         </executions>
         <configuration>
-          <skip>true</skip>
           <formatFileSets>
             <formatFileSet>
               <directory>${project.basedir}</directory>

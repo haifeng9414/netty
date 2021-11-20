@@ -29,7 +29,6 @@ import java.util.Collection;
 import java.util.List;
 
 import static io.netty.handler.codec.http.HttpObjectDecoder.DEFAULT_INITIAL_BUFFER_SIZE;
-import static io.netty.handler.codec.http.HttpObjectDecoder.DEFAULT_MAX_CHUNK_SIZE;
 import static io.netty.handler.codec.http.HttpObjectDecoder.DEFAULT_MAX_HEADER_SIZE;
 import static io.netty.handler.codec.http.HttpObjectDecoder.DEFAULT_MAX_INITIAL_LINE_LENGTH;
 import static io.netty.handler.codec.http.HttpObjectDecoder.DEFAULT_VALIDATE_HEADERS;
@@ -74,7 +73,6 @@ public class MultipleContentLengthHeadersTest {
         HttpRequestDecoder decoder = new HttpRequestDecoder(
                 DEFAULT_MAX_INITIAL_LINE_LENGTH,
                 DEFAULT_MAX_HEADER_SIZE,
-                DEFAULT_MAX_CHUNK_SIZE,
                 DEFAULT_VALIDATE_HEADERS,
                 DEFAULT_INITIAL_BUFFER_SIZE,
                 allowDuplicateContentLengths);

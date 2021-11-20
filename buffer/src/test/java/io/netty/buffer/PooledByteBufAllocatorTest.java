@@ -139,7 +139,7 @@ public class PooledByteBufAllocatorTest extends AbstractByteBufAllocatorTest<Poo
 
     @Test
     public void testArenaMetricsCache() {
-        testArenaMetrics0(new PooledByteBufAllocator(true, 2, 2, 8192, 11, 1000, 1000, 1000), 100, 1, 1, 0);
+        testArenaMetrics0(new PooledByteBufAllocator(true, 2, 2, 8192, 11, 1000, 1000, 1000, true, 0), 100, 1, 1, 0);
     }
 
     @Test
@@ -355,23 +355,20 @@ public class PooledByteBufAllocatorTest extends AbstractByteBufAllocatorTest<Poo
 
         final AtomicBoolean threadCachesCreated = new AtomicBoolean(true);
 
-        final Runnable task = new Runnable() {
-            @Override
-            public void run() {
-                ByteBuf buf = allocator.newHeapBuffer(1024, 1024);
-                for (int i = 0; i < buf.capacity(); i++) {
-                    buf.writeByte(0);
-                }
-
-                // Make sure that thread caches are actually created,
-                // so that down below we are not testing for zero
-                // thread caches without any of them ever having been initialized.
-                if (allocator.metric().numThreadLocalCaches() == 0) {
-                    threadCachesCreated.set(false);
-                }
-
-                buf.release();
+        final Runnable task = () -> {
+            ByteBuf buf = allocator.newHeapBuffer(1024, 1024);
+            for (int i = 0; i < buf.capacity(); i++) {
+                buf.writeByte(0);
             }
+
+            // Make sure that thread caches are actually created,
+            // so that down below we are not testing for zero
+            // thread caches without any of them ever having been initialized.
+            if (allocator.metric().numThreadLocalCaches() == 0) {
+                threadCachesCreated.set(false);
+            }
+
+            buf.release();
         };
 
         for (int i = 0; i < numArenas; i++) {
@@ -466,39 +463,32 @@ public class PooledByteBufAllocatorTest extends AbstractByteBufAllocatorTest<Poo
             throws InterruptedException {
         final CountDownLatch latch = new CountDownLatch(1);
         final CountDownLatch cacheLatch = new CountDownLatch(1);
-        final Thread t = new FastThreadLocalThread(new Runnable() {
+        final Thread t = new FastThreadLocalThread(() -> {
+            ByteBuf buf = allocator.newHeapBuffer(1024, 1024);
 
-            @Override
-            public void run() {
-                ByteBuf buf = allocator.newHeapBuffer(1024, 1024);
+            // Countdown the latch after we allocated a buffer. At this point the cache must exists.
+            cacheLatch.countDown();
 
-                // Countdown the latch after we allocated a buffer. At this point the cache must exists.
-                cacheLatch.countDown();
+            buf.writeZero(buf.capacity());
 
-                buf.writeZero(buf.capacity());
-
-                try {
-                    latch.await();
-                } catch (InterruptedException e) {
-                    throw new IllegalStateException(e);
-                }
-
-                buf.release();
-
-                FastThreadLocal.removeAll();
+            try {
+                latch.await();
+            } catch (InterruptedException e) {
+                throw new IllegalStateException(e);
             }
+
+            buf.release();
+
+            FastThreadLocal.removeAll();
         });
         t.start();
 
         // Wait until we allocated a buffer and so be sure the thread was started and the cache exists.
         cacheLatch.await();
 
-        return new ThreadCache() {
-            @Override
-            public void destroy() throws InterruptedException {
-                latch.countDown();
-                t.join();
-            }
+        return () -> {
+            latch.countDown();
+            t.join();
         };
     }
 
@@ -514,7 +504,7 @@ public class PooledByteBufAllocatorTest extends AbstractByteBufAllocatorTest<Poo
         // We use no caches and only one arena to maximize the chance of hitting the race-condition we
         // had before.
         ByteBufAllocator allocator = new PooledByteBufAllocator(true, 1, 1, 8192, 11, 0, 0, 0);
-        List<AllocationThread> threads = new ArrayList<AllocationThread>();
+        List<AllocationThread> threads = new ArrayList<>();
         try {
             for (int i = 0; i < 512; i++) {
                 AllocationThread thread = new AllocationThread(allocator);
@@ -561,9 +551,9 @@ public class PooledByteBufAllocatorTest extends AbstractByteBufAllocatorTest<Poo
             }
         }
 
-        private final Queue<ByteBuf> buffers = new ConcurrentLinkedQueue<ByteBuf>();
+        private final Queue<ByteBuf> buffers = new ConcurrentLinkedQueue<>();
         private final ByteBufAllocator allocator;
-        private final AtomicReference<Object> finish = new AtomicReference<Object>();
+        private final AtomicReference<Object> finish = new AtomicReference<>();
 
         AllocationThread(ByteBufAllocator allocator) {
             this.allocator = allocator;

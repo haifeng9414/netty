@@ -15,7 +15,7 @@
  */
 package io.netty.handler.codec;
 
-import io.netty.channel.ChannelDuplexHandler;
+import io.netty.channel.ChannelHandlerAdapter;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPromise;
 import io.netty.util.ReferenceCounted;
@@ -52,7 +52,7 @@ import java.util.List;
  * are of type {@link ReferenceCounted}. This is needed as the {@link MessageToMessageCodec} will call
  * {@link ReferenceCounted#release()} on encoded / decoded messages.
  */
-public abstract class MessageToMessageCodec<INBOUND_IN, OUTBOUND_IN> extends ChannelDuplexHandler {
+public abstract class MessageToMessageCodec<INBOUND_IN, OUTBOUND_IN> extends ChannelHandlerAdapter {
 
     private final MessageToMessageEncoder<Object> encoder = new MessageToMessageEncoder<Object>() {
 
@@ -77,8 +77,8 @@ public abstract class MessageToMessageCodec<INBOUND_IN, OUTBOUND_IN> extends Cha
 
         @Override
         @SuppressWarnings("unchecked")
-        protected void decode(ChannelHandlerContext ctx, Object msg, List<Object> out) throws Exception {
-            MessageToMessageCodec.this.decode(ctx, (INBOUND_IN) msg, out);
+        protected void decode(ChannelHandlerContext ctx, Object msg) throws Exception {
+            MessageToMessageCodec.this.decode(ctx, (INBOUND_IN) msg);
         }
     };
 
@@ -141,8 +141,8 @@ public abstract class MessageToMessageCodec<INBOUND_IN, OUTBOUND_IN> extends Cha
             throws Exception;
 
     /**
-     * @see MessageToMessageDecoder#decode(ChannelHandlerContext, Object, List)
+     * @see MessageToMessageDecoder#decode(ChannelHandlerContext, Object)
      */
-    protected abstract void decode(ChannelHandlerContext ctx, INBOUND_IN msg, List<Object> out)
+    protected abstract void decode(ChannelHandlerContext ctx, INBOUND_IN msg)
             throws Exception;
 }

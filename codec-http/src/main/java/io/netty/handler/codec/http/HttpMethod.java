@@ -18,7 +18,7 @@ package io.netty.handler.codec.http;
 import io.netty.util.AsciiString;
 
 import static io.netty.util.internal.MathUtil.findNextPositivePowerOfTwo;
-import static io.netty.util.internal.ObjectUtil.checkNotNull;
+import static java.util.Objects.requireNonNull;
 
 /**
  * The request method of HTTP or its derived protocols, such as
@@ -88,16 +88,16 @@ public class HttpMethod implements Comparable<HttpMethod> {
     private static final EnumNameMap<HttpMethod> methodMap;
 
     static {
-        methodMap = new EnumNameMap<HttpMethod>(
-                new EnumNameMap.Node<HttpMethod>(OPTIONS.toString(), OPTIONS),
-                new EnumNameMap.Node<HttpMethod>(GET.toString(), GET),
-                new EnumNameMap.Node<HttpMethod>(HEAD.toString(), HEAD),
-                new EnumNameMap.Node<HttpMethod>(POST.toString(), POST),
-                new EnumNameMap.Node<HttpMethod>(PUT.toString(), PUT),
-                new EnumNameMap.Node<HttpMethod>(PATCH.toString(), PATCH),
-                new EnumNameMap.Node<HttpMethod>(DELETE.toString(), DELETE),
-                new EnumNameMap.Node<HttpMethod>(TRACE.toString(), TRACE),
-                new EnumNameMap.Node<HttpMethod>(CONNECT.toString(), CONNECT));
+        methodMap = new EnumNameMap<>(
+                new EnumNameMap.Node<>(OPTIONS.toString(), OPTIONS),
+                new EnumNameMap.Node<>(GET.toString(), GET),
+                new EnumNameMap.Node<>(HEAD.toString(), HEAD),
+                new EnumNameMap.Node<>(POST.toString(), POST),
+                new EnumNameMap.Node<>(PUT.toString(), PUT),
+                new EnumNameMap.Node<>(PATCH.toString(), PATCH),
+                new EnumNameMap.Node<>(DELETE.toString(), DELETE),
+                new EnumNameMap.Node<>(TRACE.toString(), TRACE),
+                new EnumNameMap.Node<>(CONNECT.toString(), CONNECT));
     }
 
     /**
@@ -120,7 +120,7 @@ public class HttpMethod implements Comparable<HttpMethod> {
      * <a href="http://en.wikipedia.org/wiki/Internet_Content_Adaptation_Protocol">ICAP</a>
      */
     public HttpMethod(String name) {
-        name = checkNotNull(name, "name").trim();
+        name = requireNonNull(name, "name").trim();
         if (name.isEmpty()) {
             throw new IllegalArgumentException("empty name");
         }

@@ -19,7 +19,8 @@ import io.netty.handler.codec.http.cookie.CookieHeaderNames.SameSite;
 
 import static io.netty.handler.codec.http.cookie.CookieUtil.stringBuilder;
 import static io.netty.handler.codec.http.cookie.CookieUtil.validateAttributeValue;
-import static io.netty.util.internal.ObjectUtil.checkNotNull;
+
+import static java.util.Objects.requireNonNull;
 
 /**
  * The default {@link Cookie} implementation.
@@ -40,7 +41,7 @@ public class DefaultCookie implements Cookie {
      * Creates a new cookie with the specified name and value.
      */
     public DefaultCookie(String name, String value) {
-        name = checkNotNull(name, "name").trim();
+        name = requireNonNull(name, "name").trim();
         if (name.isEmpty()) {
             throw new IllegalArgumentException("empty name");
         }
@@ -60,7 +61,7 @@ public class DefaultCookie implements Cookie {
 
     @Override
     public void setValue(String value) {
-        this.value = checkNotNull(value, "value");
+        this.value = requireNonNull(value, "value");
     }
 
     @Override
@@ -216,19 +217,6 @@ public class DefaultCookie implements Cookie {
         }
 
         return 0;
-    }
-
-    /**
-     * Validate a cookie attribute value, throws a {@link IllegalArgumentException} otherwise.
-     * Only intended to be used by {@link io.netty.handler.codec.http.DefaultCookie}.
-     * @param name attribute name
-     * @param value attribute value
-     * @return the trimmed, validated attribute value
-     * @deprecated CookieUtil is package private, will be removed once old Cookie API is dropped
-     */
-    @Deprecated
-    protected String validateValue(String name, String value) {
-        return validateAttributeValue(name, value);
     }
 
     @Override

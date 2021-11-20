@@ -16,7 +16,7 @@
 
 package io.netty.handler.codec.socksx.v5;
 
-import io.netty.util.internal.ObjectUtil;
+import static java.util.Objects.requireNonNull;
 
 /**
  * The type of {@link Socks5CommandRequest}.
@@ -49,8 +49,10 @@ public class Socks5CommandType implements Comparable<Socks5CommandType> {
     }
 
     public Socks5CommandType(int byteValue, String name) {
-        this.name = ObjectUtil.checkNotNull(name, "name");
+        requireNonNull(name, "name");
+
         this.byteValue = (byte) byteValue;
+        this.name = name;
     }
 
     public byte byteValue() {

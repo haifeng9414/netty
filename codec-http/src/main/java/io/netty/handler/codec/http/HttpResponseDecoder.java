@@ -97,26 +97,25 @@ public class HttpResponseDecoder extends HttpObjectDecoder {
      * Creates a new instance with the specified parameters.
      */
     public HttpResponseDecoder(
-            int maxInitialLineLength, int maxHeaderSize, int maxChunkSize) {
-        super(maxInitialLineLength, maxHeaderSize, maxChunkSize, DEFAULT_CHUNKED_SUPPORTED);
+            int maxInitialLineLength, int maxHeaderSize) {
+        super(maxInitialLineLength, maxHeaderSize, DEFAULT_CHUNKED_SUPPORTED);
     }
 
     public HttpResponseDecoder(
-            int maxInitialLineLength, int maxHeaderSize, int maxChunkSize, boolean validateHeaders) {
-        super(maxInitialLineLength, maxHeaderSize, maxChunkSize, DEFAULT_CHUNKED_SUPPORTED, validateHeaders);
+            int maxInitialLineLength, int maxHeaderSize, boolean validateHeaders) {
+        super(maxInitialLineLength, maxHeaderSize, DEFAULT_CHUNKED_SUPPORTED, validateHeaders);
     }
 
     public HttpResponseDecoder(
-            int maxInitialLineLength, int maxHeaderSize, int maxChunkSize, boolean validateHeaders,
+            int maxInitialLineLength, int maxHeaderSize, boolean validateHeaders,
             int initialBufferSize) {
-        super(maxInitialLineLength, maxHeaderSize, maxChunkSize, DEFAULT_CHUNKED_SUPPORTED, validateHeaders,
-              initialBufferSize);
+        super(maxInitialLineLength, maxHeaderSize, DEFAULT_CHUNKED_SUPPORTED, validateHeaders, initialBufferSize);
     }
 
     public HttpResponseDecoder(
-            int maxInitialLineLength, int maxHeaderSize, int maxChunkSize, boolean validateHeaders,
+            int maxInitialLineLength, int maxHeaderSize, boolean validateHeaders,
             int initialBufferSize, boolean allowDuplicateContentLengths) {
-        super(maxInitialLineLength, maxHeaderSize, maxChunkSize, DEFAULT_CHUNKED_SUPPORTED, validateHeaders,
+        super(maxInitialLineLength, maxHeaderSize, DEFAULT_CHUNKED_SUPPORTED, validateHeaders,
               initialBufferSize, allowDuplicateContentLengths);
     }
 

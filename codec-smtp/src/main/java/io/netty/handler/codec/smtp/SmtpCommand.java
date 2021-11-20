@@ -15,10 +15,11 @@
  */
 package io.netty.handler.codec.smtp;
 
+import static java.util.Objects.requireNonNull;
+
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufUtil;
 import io.netty.util.AsciiString;
-import io.netty.util.internal.ObjectUtil;
 import io.netty.util.internal.UnstableApi;
 
 import java.util.HashMap;
@@ -43,7 +44,7 @@ public final class SmtpCommand {
     public static final SmtpCommand QUIT = new SmtpCommand(AsciiString.cached("QUIT"));
     public static final SmtpCommand EMPTY = new SmtpCommand(AsciiString.cached(""));
 
-    private static final Map<String, SmtpCommand> COMMANDS = new HashMap<String, SmtpCommand>();
+    private static final Map<String, SmtpCommand> COMMANDS = new HashMap<>();
     static {
         COMMANDS.put(EHLO.name().toString(), EHLO);
         COMMANDS.put(HELO.name().toString(), HELO);
@@ -64,7 +65,7 @@ public final class SmtpCommand {
      * Returns the {@link SmtpCommand} for the given command name.
      */
     public static SmtpCommand valueOf(CharSequence commandName) {
-        ObjectUtil.checkNotNull(commandName, "commandName");
+        requireNonNull(commandName, "commandName");
         SmtpCommand command = COMMANDS.get(commandName.toString());
         return command != null ? command : new SmtpCommand(AsciiString.of(commandName));
     }

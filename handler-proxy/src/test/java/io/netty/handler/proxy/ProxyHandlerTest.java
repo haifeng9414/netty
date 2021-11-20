@@ -29,8 +29,9 @@ import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelOption;
 import io.netty.channel.ChannelPipeline;
 import io.netty.channel.EventLoopGroup;
+import io.netty.channel.MultithreadEventLoopGroup;
 import io.netty.channel.SimpleChannelInboundHandler;
-import io.netty.channel.nio.NioEventLoopGroup;
+import io.netty.channel.nio.NioHandler;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.handler.codec.LineBasedFrameDecoder;
@@ -82,7 +83,8 @@ public class ProxyHandlerTest {
     private static final String BAD_USERNAME = "badUser";
     private static final String BAD_PASSWORD = "badPassword";
 
-    static final EventLoopGroup group = new NioEventLoopGroup(3, new DefaultThreadFactory("proxy", true));
+    static final EventLoopGroup group = new MultithreadEventLoopGroup(3,
+            new DefaultThreadFactory("proxy", true), NioHandler.newFactory());
 
     static final SslContext serverSslCtx;
     static final SslContext clientSslCtx;
@@ -409,7 +411,7 @@ public class ProxyHandlerTest {
         );
 
         // Convert the test items to the list of constructor parameters.
-        List<Object[]> params = new ArrayList<Object[]>(items.size());
+        List<Object[]> params = new ArrayList<>(items.size());
         for (Object i: items) {
             params.add(new Object[] { i });
         }
@@ -456,8 +458,8 @@ public class ProxyHandlerTest {
 
     private static final class SuccessTestHandler extends SimpleChannelInboundHandler<Object> {
 
-        final Queue<String> received = new LinkedBlockingQueue<String>();
-        final Queue<Throwable> exceptions = new LinkedBlockingQueue<Throwable>();
+        final Queue<String> received = new LinkedBlockingQueue<>();
+        final Queue<Throwable> exceptions = new LinkedBlockingQueue<>();
         volatile int eventCount;
 
         private static void readIfNeeded(ChannelHandlerContext ctx) {
@@ -487,7 +489,7 @@ public class ProxyHandlerTest {
         }
 
         @Override
-        protected void channelRead0(ChannelHandlerContext ctx, Object msg) throws Exception {
+        protected void messageReceived(ChannelHandlerContext ctx, Object msg) throws Exception {
             String str = ((ByteBuf) msg).toString(CharsetUtil.US_ASCII);
             received.add(str);
             if ("2".equals(str)) {
@@ -505,7 +507,7 @@ public class ProxyHandlerTest {
 
     private static final class FailureTestHandler extends SimpleChannelInboundHandler<Object> {
 
-        final Queue<Throwable> exceptions = new LinkedBlockingQueue<Throwable>();
+        final Queue<Throwable> exceptions = new LinkedBlockingQueue<>();
 
         /**
          * A latch that counts down when:
@@ -519,14 +521,11 @@ public class ProxyHandlerTest {
         @Override
         public void channelActive(ChannelHandlerContext ctx) throws Exception {
             ctx.writeAndFlush(Unpooled.copiedBuffer("A\n", CharsetUtil.US_ASCII)).addListener(
-                    new ChannelFutureListener() {
-                        @Override
-                        public void operationComplete(ChannelFuture future) throws Exception {
-                            latch.countDown();
-                            if (!(future.cause() instanceof ProxyConnectException)) {
-                                exceptions.add(new AssertionError(
-                                        "Unexpected failure cause for initial write: " + future.cause()));
-                            }
+                    (ChannelFutureListener) future -> {
+                        latch.countDown();
+                        if (!(future.cause() instanceof ProxyConnectException)) {
+                            exceptions.add(new AssertionError(
+                                    "Unexpected failure cause for initial write: " + future.cause()));
                         }
                     });
         }
@@ -544,7 +543,7 @@ public class ProxyHandlerTest {
         }
 
         @Override
-        protected void channelRead0(ChannelHandlerContext ctx, Object msg) throws Exception {
+        protected void messageReceived(ChannelHandlerContext ctx, Object msg) throws Exception {
             fail("Unexpected message: " + msg);
         }
 

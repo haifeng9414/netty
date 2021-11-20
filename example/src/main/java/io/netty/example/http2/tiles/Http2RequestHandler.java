@@ -52,7 +52,7 @@ public class Http2RequestHandler extends SimpleChannelInboundHandler<FullHttpReq
     private static final String IMAGE_COORDINATE_X = "x";
 
     @Override
-    protected void channelRead0(ChannelHandlerContext ctx, FullHttpRequest request) throws Exception {
+    protected void messageReceived(ChannelHandlerContext ctx, FullHttpRequest request) throws Exception {
         QueryStringDecoder queryString = new QueryStringDecoder(request.uri());
         String streamId = streamId(request);
         int latency = toInt(firstValue(queryString, LATENCY_FIELD_NAME), 0);
@@ -98,11 +98,8 @@ public class Http2RequestHandler extends SimpleChannelInboundHandler<FullHttpReq
             final FullHttpResponse response, final FullHttpRequest request) {
         setContentLength(response, response.content().readableBytes());
         streamId(response, streamId);
-        ctx.executor().schedule(new Runnable() {
-            @Override
-            public void run() {
-                ctx.writeAndFlush(response);
-            }
+        ctx.executor().schedule(() -> {
+            ctx.writeAndFlush(response);
         }, latency, TimeUnit.MILLISECONDS);
     }
 

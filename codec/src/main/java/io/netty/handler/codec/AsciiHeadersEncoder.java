@@ -16,6 +16,7 @@
 
 package io.netty.handler.codec;
 
+import static java.util.Objects.requireNonNull;
 
 import java.util.Map.Entry;
 
@@ -23,7 +24,6 @@ import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufUtil;
 import io.netty.util.AsciiString;
 import io.netty.util.CharsetUtil;
-import io.netty.util.internal.ObjectUtil;
 
 public final class AsciiHeadersEncoder {
 
@@ -64,9 +64,13 @@ public final class AsciiHeadersEncoder {
     }
 
     public AsciiHeadersEncoder(ByteBuf buf, SeparatorType separatorType, NewlineType newlineType) {
-        this.buf = ObjectUtil.checkNotNull(buf, "buf");
-        this.separatorType = ObjectUtil.checkNotNull(separatorType, "separatorType");
-        this.newlineType = ObjectUtil.checkNotNull(newlineType, "newlineType");
+        requireNonNull(buf, "buf");
+        requireNonNull(separatorType, "separatorType");
+        requireNonNull(newlineType, "newlineType");
+
+        this.buf = buf;
+        this.separatorType = separatorType;
+        this.newlineType = newlineType;
     }
 
     public void encode(Entry<CharSequence, CharSequence> entry) {

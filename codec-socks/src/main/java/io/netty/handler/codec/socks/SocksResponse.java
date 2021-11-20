@@ -15,7 +15,7 @@
  */
 package io.netty.handler.codec.socks;
 
-import io.netty.util.internal.ObjectUtil;
+import static java.util.Objects.requireNonNull;
 
 /**
  * An abstract class that defines a SocksResponse, providing common properties for
@@ -31,7 +31,8 @@ public abstract class SocksResponse extends SocksMessage {
 
     protected SocksResponse(SocksResponseType responseType) {
         super(SocksMessageType.RESPONSE);
-        this.responseType = ObjectUtil.checkNotNull(responseType, "responseType");
+        requireNonNull(responseType, "responseType");
+        this.responseType = responseType;
     }
 
     /**

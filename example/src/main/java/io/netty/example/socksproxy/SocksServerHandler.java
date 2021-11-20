@@ -39,14 +39,14 @@ public final class SocksServerHandler extends SimpleChannelInboundHandler<SocksM
     private SocksServerHandler() { }
 
     @Override
-    public void channelRead0(ChannelHandlerContext ctx, SocksMessage socksRequest) throws Exception {
+    public void messageReceived(ChannelHandlerContext ctx, SocksMessage socksRequest) throws Exception {
         switch (socksRequest.version()) {
             case SOCKS4a:
                 Socks4CommandRequest socksV4CmdRequest = (Socks4CommandRequest) socksRequest;
                 if (socksV4CmdRequest.type() == Socks4CommandType.CONNECT) {
                     ctx.pipeline().addLast(new SocksServerConnectHandler());
-                    ctx.pipeline().remove(this);
                     ctx.fireChannelRead(socksRequest);
+                    ctx.pipeline().remove(this);
                 } else {
                     ctx.close();
                 }
@@ -65,8 +65,8 @@ public final class SocksServerHandler extends SimpleChannelInboundHandler<SocksM
                     Socks5CommandRequest socks5CmdRequest = (Socks5CommandRequest) socksRequest;
                     if (socks5CmdRequest.type() == Socks5CommandType.CONNECT) {
                         ctx.pipeline().addLast(new SocksServerConnectHandler());
-                        ctx.pipeline().remove(this);
                         ctx.fireChannelRead(socksRequest);
+                        ctx.pipeline().remove(this);
                     } else {
                         ctx.close();
                     }

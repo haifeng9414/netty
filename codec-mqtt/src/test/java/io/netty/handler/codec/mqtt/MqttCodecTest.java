@@ -27,6 +27,7 @@ import io.netty.util.Attribute;
 import io.netty.util.CharsetUtil;
 import org.junit.Before;
 import org.junit.Test;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 
@@ -89,12 +90,11 @@ public class MqttCodecTest {
         final MqttConnectMessage message = createConnectMessage(MqttVersion.MQTT_3_1);
         ByteBuf byteBuf = MqttEncoder.doEncode(ctx, message);
 
-        final List<Object> out = new LinkedList<Object>();
-        mqttDecoder.decode(ctx, byteBuf, out);
+        ArgumentCaptor<MqttConnectMessage> captor = ArgumentCaptor.forClass(MqttConnectMessage.class);
+        mqttDecoder.decode(ctx, byteBuf);
+        verify(ctx).fireChannelRead(captor.capture());
 
-        assertEquals("Expected one object but got " + out.size(), 1, out.size());
-
-        final MqttConnectMessage decodedMessage = (MqttConnectMessage) out.get(0);
+        final MqttConnectMessage decodedMessage = captor.getValue();
 
         validateFixedHeaders(message.fixedHeader(), decodedMessage.fixedHeader());
         validateConnectVariableHeader(message.variableHeader(), decodedMessage.variableHeader());
@@ -106,12 +106,11 @@ public class MqttCodecTest {
         final MqttConnectMessage message = createConnectMessage(MqttVersion.MQTT_3_1_1);
         ByteBuf byteBuf = MqttEncoder.doEncode(ctx, message);
 
-        final List<Object> out = new LinkedList<Object>();
-        mqttDecoder.decode(ctx, byteBuf, out);
+        ArgumentCaptor<MqttConnectMessage> captor = ArgumentCaptor.forClass(MqttConnectMessage.class);
+        mqttDecoder.decode(ctx, byteBuf);
+        verify(ctx).fireChannelRead(captor.capture());
 
-        assertEquals("Expected one object but got " + out.size(), 1, out.size());
-
-        final MqttConnectMessage decodedMessage = (MqttConnectMessage) out.get(0);
+        final MqttConnectMessage decodedMessage = captor.getValue();
 
         validateFixedHeaders(message.fixedHeader(), decodedMessage.fixedHeader());
         validateConnectVariableHeader(message.variableHeader(), decodedMessage.variableHeader());
@@ -125,12 +124,12 @@ public class MqttCodecTest {
         try {
             // Set the reserved flag in the CONNECT Packet to 1
             byteBuf.setByte(9, byteBuf.getByte(9) | 0x1);
-            final List<Object> out = new LinkedList<Object>();
-            mqttDecoder.decode(ctx, byteBuf, out);
 
-            assertEquals("Expected one object but got " + out.size(), 1, out.size());
+            ArgumentCaptor<MqttMessage> captor = ArgumentCaptor.forClass(MqttMessage.class);
+            mqttDecoder.decode(ctx, byteBuf);
+            verify(ctx).fireChannelRead(captor.capture());
 
-            final MqttMessage decodedMessage = (MqttMessage) out.get(0);
+            final MqttMessage decodedMessage = captor.getValue();
             assertTrue(decodedMessage.decoderResult().isFailure());
             Throwable cause = decodedMessage.decoderResult().cause();
             assertTrue(cause instanceof DecoderException);
@@ -161,12 +160,11 @@ public class MqttCodecTest {
         final MqttConnAckMessage message = createConnAckMessage();
         ByteBuf byteBuf = MqttEncoder.doEncode(ctx, message);
 
-        final List<Object> out = new LinkedList<Object>();
-        mqttDecoder.decode(ctx, byteBuf, out);
+        ArgumentCaptor<MqttConnAckMessage> captor = ArgumentCaptor.forClass(MqttConnAckMessage.class);
+        mqttDecoder.decode(ctx, byteBuf);
+        verify(ctx).fireChannelRead(captor.capture());
 
-        assertEquals("Expected one object but got " + out.size(), 1, out.size());
-
-        final MqttConnAckMessage decodedMessage = (MqttConnAckMessage) out.get(0);
+        final MqttConnAckMessage decodedMessage = captor.getValue();
         validateFixedHeaders(message.fixedHeader(), decodedMessage.fixedHeader());
         validateConnAckVariableHeader(message.variableHeader(), decodedMessage.variableHeader());
     }
@@ -176,12 +174,11 @@ public class MqttCodecTest {
         final MqttPublishMessage message = createPublishMessage();
         ByteBuf byteBuf = MqttEncoder.doEncode(ctx, message);
 
-        final List<Object> out = new LinkedList<Object>();
-        mqttDecoder.decode(ctx, byteBuf, out);
+        ArgumentCaptor<MqttPublishMessage> captor = ArgumentCaptor.forClass(MqttPublishMessage.class);
+        mqttDecoder.decode(ctx, byteBuf);
+        verify(ctx).fireChannelRead(captor.capture());
 
-        assertEquals("Expected one object but got " + out.size(), 1, out.size());
-
-        final MqttPublishMessage decodedMessage = (MqttPublishMessage) out.get(0);
+        final MqttPublishMessage decodedMessage = captor.getValue();
         validateFixedHeaders(message.fixedHeader(), decodedMessage.fixedHeader());
         validatePublishVariableHeader(message.variableHeader(), decodedMessage.variableHeader());
         validatePublishPayload(message.payload(), decodedMessage.payload());
@@ -212,12 +209,11 @@ public class MqttCodecTest {
         final MqttSubscribeMessage message = createSubscribeMessage();
         ByteBuf byteBuf = MqttEncoder.doEncode(ctx, message);
 
-        final List<Object> out = new LinkedList<Object>();
-        mqttDecoder.decode(ctx, byteBuf, out);
+        ArgumentCaptor<MqttSubscribeMessage> captor = ArgumentCaptor.forClass(MqttSubscribeMessage.class);
+        mqttDecoder.decode(ctx, byteBuf);
+        verify(ctx).fireChannelRead(captor.capture());
 
-        assertEquals("Expected one object but got " + out.size(), 1, out.size());
-
-        final MqttSubscribeMessage decodedMessage = (MqttSubscribeMessage) out.get(0);
+        final MqttSubscribeMessage decodedMessage = captor.getValue();
         validateFixedHeaders(message.fixedHeader(), decodedMessage.fixedHeader());
         validateMessageIdVariableHeader(message.variableHeader(), decodedMessage.variableHeader());
         validateSubscribePayload(message.payload(), decodedMessage.payload());
@@ -228,12 +224,11 @@ public class MqttCodecTest {
         final MqttSubAckMessage message = createSubAckMessage();
         ByteBuf byteBuf = MqttEncoder.doEncode(ctx, message);
 
-        final List<Object> out = new LinkedList<Object>();
-        mqttDecoder.decode(ctx, byteBuf, out);
+        ArgumentCaptor<MqttSubAckMessage> captor = ArgumentCaptor.forClass(MqttSubAckMessage.class);
+        mqttDecoder.decode(ctx, byteBuf);
+        verify(ctx).fireChannelRead(captor.capture());
 
-        assertEquals("Expected one object but got " + out.size(), 1, out.size());
-
-        final MqttSubAckMessage decodedMessage = (MqttSubAckMessage) out.get(0);
+        final MqttSubAckMessage decodedMessage = captor.getValue();
         validateFixedHeaders(message.fixedHeader(), decodedMessage.fixedHeader());
         validateMessageIdVariableHeader(message.variableHeader(), decodedMessage.variableHeader());
         validateSubAckPayload(message.payload(), decodedMessage.payload());
@@ -250,12 +245,11 @@ public class MqttCodecTest {
 
         ByteBuf byteBuf = MqttEncoder.doEncode(ctx, message);
 
-        List<Object> out = new LinkedList<Object>();
-        mqttDecoder.decode(ctx, byteBuf, out);
+        ArgumentCaptor<MqttSubAckMessage> captor = ArgumentCaptor.forClass(MqttSubAckMessage.class);
+        mqttDecoder.decode(ctx, byteBuf);
+        verify(ctx).fireChannelRead(captor.capture());
 
-        assertEquals("Expected one object but got " + out.size(), 1, out.size());
-
-        MqttSubAckMessage decodedMessage = (MqttSubAckMessage) out.get(0);
+        MqttSubAckMessage decodedMessage = captor.getValue();
         validateFixedHeaders(message.fixedHeader(), decodedMessage.fixedHeader());
         validateMessageIdVariableHeader(message.variableHeader(), decodedMessage.variableHeader());
         validateSubAckPayload(message.payload(), decodedMessage.payload());
@@ -268,12 +262,11 @@ public class MqttCodecTest {
         final MqttUnsubscribeMessage message = createUnsubscribeMessage();
         ByteBuf byteBuf = MqttEncoder.doEncode(ctx, message);
 
-        final List<Object> out = new LinkedList<Object>();
-        mqttDecoder.decode(ctx, byteBuf, out);
+        ArgumentCaptor<MqttUnsubscribeMessage> captor = ArgumentCaptor.forClass(MqttUnsubscribeMessage.class);
+        mqttDecoder.decode(ctx, byteBuf);
+        verify(ctx).fireChannelRead(captor.capture());
 
-        assertEquals("Expected one object but got " + out.size(), 1, out.size());
-
-        final MqttUnsubscribeMessage decodedMessage = (MqttUnsubscribeMessage) out.get(0);
+        final MqttUnsubscribeMessage decodedMessage = captor.getValue();
         validateFixedHeaders(message.fixedHeader(), decodedMessage.fixedHeader());
         validateMessageIdVariableHeader(message.variableHeader(), decodedMessage.variableHeader());
         validateUnsubscribePayload(message.payload(), decodedMessage.payload());
@@ -308,12 +301,12 @@ public class MqttCodecTest {
         try {
             // setting an invalid message type (15, reserved and forbidden by MQTT 3.1.1 spec)
             byteBuf.setByte(0, 0xF0);
-            final List<Object> out = new LinkedList<Object>();
-            mqttDecoder.decode(ctx, byteBuf, out);
 
-            assertEquals("Expected one object but got " + out.size(), 1, out.size());
+            ArgumentCaptor<MqttMessage> captor = ArgumentCaptor.forClass(MqttMessage.class);
+            mqttDecoder.decode(ctx, byteBuf);
+            verify(ctx).fireChannelRead(captor.capture());
 
-            final MqttMessage decodedMessage = (MqttMessage) out.get(0);
+            final MqttMessage decodedMessage = captor.getValue();
             assertTrue(decodedMessage.decoderResult().isFailure());
             Throwable cause = decodedMessage.decoderResult().cause();
             assertTrue(cause instanceof DecoderException);
@@ -329,12 +322,11 @@ public class MqttCodecTest {
         ByteBuf byteBuf = MqttEncoder.doEncode(ctx, message);
 
         try {
-            final List<Object> out = new LinkedList<Object>();
-            mqttDecoderLimitedMessageSize.decode(ctx, byteBuf, out);
+            ArgumentCaptor<MqttMessage> captor = ArgumentCaptor.forClass(MqttMessage.class);
+            mqttDecoderLimitedMessageSize.decode(ctx, byteBuf);
+            verify(ctx).fireChannelRead(captor.capture());
 
-            assertEquals("Expected one object but got " + out.size(), 1, out.size());
-
-            final MqttMessage decodedMessage = (MqttMessage) out.get(0);
+            final MqttMessage decodedMessage = captor.getValue();
 
             validateFixedHeaders(message.fixedHeader(), decodedMessage.fixedHeader());
             validateConnectVariableHeader(message.variableHeader(),
@@ -351,12 +343,11 @@ public class MqttCodecTest {
         ByteBuf byteBuf = MqttEncoder.doEncode(ctx, message);
 
         try {
-            final List<Object> out = new LinkedList<Object>();
-            mqttDecoderLimitedMessageSize.decode(ctx, byteBuf, out);
+            ArgumentCaptor<MqttMessage> captor = ArgumentCaptor.forClass(MqttMessage.class);
+            mqttDecoderLimitedMessageSize.decode(ctx, byteBuf);
+            verify(ctx).fireChannelRead(captor.capture());
 
-            assertEquals("Expected one object but got " + out.size(), 1, out.size());
-
-            final MqttMessage decodedMessage = (MqttMessage) out.get(0);
+            final MqttMessage decodedMessage = captor.getValue();
 
             validateFixedHeaders(message.fixedHeader(), decodedMessage.fixedHeader());
             validateConnectVariableHeader(message.variableHeader(),
@@ -373,12 +364,11 @@ public class MqttCodecTest {
         ByteBuf byteBuf = MqttEncoder.doEncode(ctx, message);
 
         try {
-            final List<Object> out = new LinkedList<Object>();
-            mqttDecoderLimitedMessageSize.decode(ctx, byteBuf, out);
+            ArgumentCaptor<MqttMessage> captor = ArgumentCaptor.forClass(MqttMessage.class);
+            mqttDecoderLimitedMessageSize.decode(ctx, byteBuf);
+            verify(ctx).fireChannelRead(captor.capture());
 
-            assertEquals("Expected one object but got " + out.size(), 1, out.size());
-
-            final MqttMessage decodedMessage = (MqttMessage) out.get(0);
+            final MqttMessage decodedMessage = captor.getValue();
             validateFixedHeaders(message.fixedHeader(), decodedMessage.fixedHeader());
             validateDecoderExceptionTooLargeMessage(decodedMessage);
         } finally {
@@ -392,12 +382,11 @@ public class MqttCodecTest {
         ByteBuf byteBuf = MqttEncoder.doEncode(ctx, message);
 
         try {
-            final List<Object> out = new LinkedList<Object>();
-            mqttDecoderLimitedMessageSize.decode(ctx, byteBuf, out);
+            ArgumentCaptor<MqttMessage> captor = ArgumentCaptor.forClass(MqttMessage.class);
+            mqttDecoderLimitedMessageSize.decode(ctx, byteBuf);
+            verify(ctx).fireChannelRead(captor.capture());
 
-            assertEquals("Expected one object but got " + out.size(), 1, out.size());
-
-            final MqttMessage decodedMessage = (MqttMessage) out.get(0);
+            final MqttMessage decodedMessage = captor.getValue();
 
             validateFixedHeaders(message.fixedHeader(), decodedMessage.fixedHeader());
             validatePublishVariableHeader(message.variableHeader(),
@@ -414,12 +403,11 @@ public class MqttCodecTest {
         ByteBuf byteBuf = MqttEncoder.doEncode(ctx, message);
 
         try {
-            final List<Object> out = new LinkedList<Object>();
-            mqttDecoderLimitedMessageSize.decode(ctx, byteBuf, out);
+            ArgumentCaptor<MqttMessage> captor = ArgumentCaptor.forClass(MqttMessage.class);
+            mqttDecoderLimitedMessageSize.decode(ctx, byteBuf);
+            verify(ctx).fireChannelRead(captor.capture());
 
-            assertEquals("Expected one object but got " + out.size(), 1, out.size());
-
-            final MqttMessage decodedMessage = (MqttMessage) out.get(0);
+            final MqttMessage decodedMessage = captor.getValue();
             validateFixedHeaders(message.fixedHeader(), decodedMessage.fixedHeader());
             validateMessageIdVariableHeader(message.variableHeader(),
                     (MqttMessageIdVariableHeader) decodedMessage.variableHeader());
@@ -435,12 +423,11 @@ public class MqttCodecTest {
         ByteBuf byteBuf = MqttEncoder.doEncode(ctx, message);
 
         try {
-            final List<Object> out = new LinkedList<Object>();
-            mqttDecoderLimitedMessageSize.decode(ctx, byteBuf, out);
+            ArgumentCaptor<MqttMessage> captor = ArgumentCaptor.forClass(MqttMessage.class);
+            mqttDecoderLimitedMessageSize.decode(ctx, byteBuf);
+            verify(ctx).fireChannelRead(captor.capture());
 
-            assertEquals("Expected one object but got " + out.size(), 1, out.size());
-
-            final MqttMessage decodedMessage = (MqttMessage) out.get(0);
+            final MqttMessage decodedMessage = captor.getValue();
             validateFixedHeaders(message.fixedHeader(), decodedMessage.fixedHeader());
             validateMessageIdVariableHeader(message.variableHeader(),
                     (MqttMessageIdVariableHeader) decodedMessage.variableHeader());
@@ -456,12 +443,11 @@ public class MqttCodecTest {
         ByteBuf byteBuf = MqttEncoder.doEncode(ctx, message);
 
         try {
-            final List<Object> out = new LinkedList<Object>();
-            mqttDecoderLimitedMessageSize.decode(ctx, byteBuf, out);
+            ArgumentCaptor<MqttMessage> captor = ArgumentCaptor.forClass(MqttMessage.class);
+            mqttDecoderLimitedMessageSize.decode(ctx, byteBuf);
+            verify(ctx).fireChannelRead(captor.capture());
 
-            assertEquals("Expected one object but got " + out.size(), 1, out.size());
-
-            final MqttMessage decodedMessage = (MqttMessage) out.get(0);
+            final MqttMessage decodedMessage = captor.getValue();
             validateFixedHeaders(message.fixedHeader(), decodedMessage.fixedHeader());
             validateMessageIdVariableHeader(message.variableHeader(),
                     (MqttMessageIdVariableHeader) decodedMessage.variableHeader());
@@ -482,12 +468,11 @@ public class MqttCodecTest {
                 createConnectMessage(MqttVersion.MQTT_5, USER_NAME, PASSWORD, props, willProps);
         ByteBuf byteBuf = MqttEncoder.doEncode(ctx, message);
 
-        final List<Object> out = new LinkedList<Object>();
-        mqttDecoder.decode(ctx, byteBuf, out);
+        ArgumentCaptor<MqttConnectMessage> captor = ArgumentCaptor.forClass(MqttConnectMessage.class);
+        mqttDecoder.decode(ctx, byteBuf);
+        verify(ctx).fireChannelRead(captor.capture());
 
-        assertEquals("Expected one object but got " + out.size(), 1, out.size());
-
-        final MqttConnectMessage decodedMessage = (MqttConnectMessage) out.get(0);
+        final MqttConnectMessage decodedMessage = captor.getValue();
 
         validateFixedHeaders(message.fixedHeader(), decodedMessage.fixedHeader());
         validateConnectVariableHeader(message.variableHeader(), decodedMessage.variableHeader());
@@ -503,13 +488,12 @@ public class MqttCodecTest {
         final MqttConnAckMessage message = createConnAckMessage(props);
         ByteBuf byteBuf = MqttEncoder.doEncode(ctx, message);
 
-        final List<Object> out = new LinkedList<Object>();
+        ArgumentCaptor<MqttConnAckMessage> captor = ArgumentCaptor.forClass(MqttConnAckMessage.class);
+        mqttDecoder.decode(ctx, byteBuf);
+        verify(ctx).fireChannelRead(captor.capture());
 
-        mqttDecoder.decode(ctx, byteBuf, out);
+        final MqttConnAckMessage decodedMessage = captor.getValue();
 
-        assertEquals("Expected one object but got " + out.size(), 1, out.size());
-
-        final MqttConnAckMessage decodedMessage = (MqttConnAckMessage) out.get(0);
         validateFixedHeaders(message.fixedHeader(), decodedMessage.fixedHeader());
         validateConnAckVariableHeader(message.variableHeader(), decodedMessage.variableHeader());
     }
@@ -526,13 +510,12 @@ public class MqttCodecTest {
         final MqttPublishMessage message = createPublishMessage(props);
         ByteBuf byteBuf = MqttEncoder.doEncode(ctx, message);
 
-        final List<Object> out = new LinkedList<Object>();
+        ArgumentCaptor<MqttPublishMessage> captor = ArgumentCaptor.forClass(MqttPublishMessage.class);
+        mqttDecoder.decode(ctx, byteBuf);
+        verify(ctx).fireChannelRead(captor.capture());
 
-        mqttDecoder.decode(ctx, byteBuf, out);
+        final MqttPublishMessage decodedMessage = captor.getValue();
 
-        assertEquals("Expected one object but got " + out.size(), 1, out.size());
-
-        final MqttPublishMessage decodedMessage = (MqttPublishMessage) out.get(0);
         validateFixedHeaders(message.fixedHeader(), decodedMessage.fixedHeader());
         validatePublishVariableHeader(message.variableHeader(), decodedMessage.variableHeader());
         validatePublishPayload(message.payload(), decodedMessage.payload());
@@ -547,13 +530,12 @@ public class MqttCodecTest {
         final MqttMessage message = createPubAckMessage((byte) 0x87, props);
         ByteBuf byteBuf = MqttEncoder.doEncode(ctx, message);
 
-        final List<Object> out = new LinkedList<Object>();
+        ArgumentCaptor<MqttMessage> captor = ArgumentCaptor.forClass(MqttMessage.class);
+        mqttDecoder.decode(ctx, byteBuf);
+        verify(ctx).fireChannelRead(captor.capture());
 
-        mqttDecoder.decode(ctx, byteBuf, out);
+        final MqttMessage decodedMessage = captor.getValue();
 
-        assertEquals("Expected one object but got " + out.size(), 1, out.size());
-
-        final MqttMessage decodedMessage = (MqttMessage) out.get(0);
         validateFixedHeaders(message.fixedHeader(), decodedMessage.fixedHeader());
         validatePubReplyVariableHeader((MqttPubReplyMessageVariableHeader) message.variableHeader(),
                 (MqttPubReplyMessageVariableHeader) decodedMessage.variableHeader());
@@ -565,13 +547,12 @@ public class MqttCodecTest {
         final MqttMessage message = createPubAckMessage((byte) 0, MqttProperties.NO_PROPERTIES);
         ByteBuf byteBuf = MqttEncoder.doEncode(ctx, message);
 
-        final List<Object> out = new LinkedList<Object>();
+        ArgumentCaptor<MqttMessage> captor = ArgumentCaptor.forClass(MqttMessage.class);
+        mqttDecoder.decode(ctx, byteBuf);
+        verify(ctx).fireChannelRead(captor.capture());
 
-        mqttDecoder.decode(ctx, byteBuf, out);
+        final MqttMessage decodedMessage = captor.getValue();
 
-        assertEquals("Expected one object but got " + out.size(), 1, out.size());
-
-        final MqttMessage decodedMessage = (MqttMessage) out.get(0);
         validateFixedHeaders(message.fixedHeader(), decodedMessage.fixedHeader());
         validatePubReplyVariableHeader((MqttPubReplyMessageVariableHeader) message.variableHeader(),
                 (MqttPubReplyMessageVariableHeader) decodedMessage.variableHeader());
@@ -584,13 +565,12 @@ public class MqttCodecTest {
         final MqttSubAckMessage message = createSubAckMessage(props, new int[] {1, 2, 0, 0x87 /* not authorized */});
         ByteBuf byteBuf = MqttEncoder.doEncode(ctx, message);
 
-        final List<Object> out = new LinkedList<Object>();
+        ArgumentCaptor<MqttSubAckMessage> captor = ArgumentCaptor.forClass(MqttSubAckMessage.class);
+        mqttDecoder.decode(ctx, byteBuf);
+        verify(ctx).fireChannelRead(captor.capture());
 
-        mqttDecoder.decode(ctx, byteBuf, out);
+        final MqttSubAckMessage decodedMessage = captor.getValue();
 
-        assertEquals("Expected one object but got " + out.size(), 1, out.size());
-
-        final MqttSubAckMessage decodedMessage = (MqttSubAckMessage) out.get(0);
         validateFixedHeaders(message.fixedHeader(), decodedMessage.fixedHeader());
         validatePacketIdAndPropertiesVariableHeader(
                 (MqttMessageIdAndPropertiesVariableHeader) message.variableHeader(),
@@ -618,12 +598,12 @@ public class MqttCodecTest {
                 .build();
         ByteBuf byteBuf = MqttEncoder.doEncode(ctx, message);
 
-        final List<Object> out = new LinkedList<Object>();
+        ArgumentCaptor<MqttSubscribeMessage> captor = ArgumentCaptor.forClass(MqttSubscribeMessage.class);
+        mqttDecoder.decode(ctx, byteBuf);
+        verify(ctx).fireChannelRead(captor.capture());
 
-        mqttDecoder.decode(ctx, byteBuf, out);
+        final MqttSubscribeMessage decodedMessage = captor.getValue();
 
-        assertEquals("Expected one object but got " + out.size(), 1, out.size());
-        final MqttSubscribeMessage decodedMessage = (MqttSubscribeMessage) out.get(0);
         validateFixedHeaders(message.fixedHeader(), decodedMessage.fixedHeader());
         final MqttMessageIdAndPropertiesVariableHeader expectedHeader =
                 (MqttMessageIdAndPropertiesVariableHeader) message.variableHeader();
@@ -646,13 +626,12 @@ public class MqttCodecTest {
                 .build();
         ByteBuf byteBuf = MqttEncoder.doEncode(ctx, message);
 
-        final List<Object> out = new LinkedList<Object>();
+        ArgumentCaptor<MqttUnsubAckMessage> captor = ArgumentCaptor.forClass(MqttUnsubAckMessage.class);
+        mqttDecoder.decode(ctx, byteBuf);
+        verify(ctx).fireChannelRead(captor.capture());
 
-        mqttDecoder.decode(ctx, byteBuf, out);
+        final MqttUnsubAckMessage decodedMessage = captor.getValue();
 
-        assertEquals("Expected one object but got " + out.size(), 1, out.size());
-
-        final MqttUnsubAckMessage decodedMessage = (MqttUnsubAckMessage) out.get(0);
         validateFixedHeaders(message.fixedHeader(), decodedMessage.fixedHeader());
         validatePacketIdAndPropertiesVariableHeader(
                 (MqttMessageIdAndPropertiesVariableHeader) message.variableHeader(),
@@ -673,12 +652,12 @@ public class MqttCodecTest {
                 .build();
         ByteBuf byteBuf = MqttEncoder.doEncode(ctx, message);
 
-        final List<Object> out = new LinkedList<Object>();
+        ArgumentCaptor<MqttMessage> captor = ArgumentCaptor.forClass(MqttMessage.class);
+        mqttDecoder.decode(ctx, byteBuf);
+        verify(ctx).fireChannelRead(captor.capture());
 
-        mqttDecoder.decode(ctx, byteBuf, out);
+        final MqttMessage decodedMessage = captor.getValue();
 
-        assertEquals("Expected one object but got " + out.size(), 1, out.size());
-        final MqttMessage decodedMessage = (MqttMessage) out.get(0);
         validateFixedHeaders(message.fixedHeader(), decodedMessage.fixedHeader());
         validateReasonCodeAndPropertiesVariableHeader(
                 (MqttReasonCodeAndPropertiesVariableHeader) message.variableHeader(),
@@ -694,12 +673,12 @@ public class MqttCodecTest {
                 .build();
         ByteBuf byteBuf = MqttEncoder.doEncode(ctx, message);
 
-        final List<Object> out = new LinkedList<Object>();
+        ArgumentCaptor<MqttMessage> captor = ArgumentCaptor.forClass(MqttMessage.class);
+        mqttDecoder.decode(ctx, byteBuf);
+        verify(ctx).fireChannelRead(captor.capture());
 
-        mqttDecoder.decode(ctx, byteBuf, out);
+        final MqttMessage decodedMessage = captor.getValue();
 
-        assertEquals("Expected one object but got " + out.size(), 1, out.size());
-        final MqttMessage decodedMessage = (MqttMessage) out.get(0);
         validateFixedHeaders(message.fixedHeader(), decodedMessage.fixedHeader());
         validateReasonCodeAndPropertiesVariableHeader(
                 (MqttReasonCodeAndPropertiesVariableHeader) message.variableHeader(),
@@ -718,12 +697,12 @@ public class MqttCodecTest {
                 .build();
         ByteBuf byteBuf = MqttEncoder.doEncode(ctx, message);
 
-        final List<Object> out = new LinkedList<Object>();
+        ArgumentCaptor<MqttMessage> captor = ArgumentCaptor.forClass(MqttMessage.class);
+        mqttDecoder.decode(ctx, byteBuf);
+        verify(ctx).fireChannelRead(captor.capture());
 
-        mqttDecoder.decode(ctx, byteBuf, out);
+        final MqttMessage decodedMessage = captor.getValue();
 
-        assertEquals("Expected one object but got " + out.size(), 1, out.size());
-        final MqttMessage decodedMessage = (MqttMessage) out.get(0);
         validateFixedHeaders(message.fixedHeader(), decodedMessage.fixedHeader());
         validateReasonCodeAndPropertiesVariableHeader(
                 (MqttReasonCodeAndPropertiesVariableHeader) message.variableHeader(),
@@ -740,14 +719,12 @@ public class MqttCodecTest {
         verify(versionAttrMock, times(1)).set(MqttVersion.MQTT_5);
         clearInvocations(versionAttrMock);
 
-        final List<Object> connectOut = new LinkedList<Object>();
-        mqttDecoder.decode(ctx, connectByteBuf, connectOut);
-
+        ArgumentCaptor<MqttConnectMessage> captor = ArgumentCaptor.forClass(MqttConnectMessage.class);
+        mqttDecoder.decode(ctx, connectByteBuf);
+        verify(ctx).fireChannelRead(captor.capture());
         verify(versionAttrMock, times(1)).set(MqttVersion.MQTT_5);
 
-        assertEquals("Expected one CONNECT object but got " + connectOut.size(), 1, connectOut.size());
-
-        final MqttConnectMessage decodedConnectMessage = (MqttConnectMessage) connectOut.get(0);
+        final MqttConnectMessage decodedConnectMessage = captor.getValue();
 
         validateFixedHeaders(connectMessage.fixedHeader(), decodedConnectMessage.fixedHeader());
         validateConnectVariableHeader(connectMessage.variableHeader(), decodedConnectMessage.variableHeader());
@@ -759,12 +736,11 @@ public class MqttCodecTest {
     private void testMessageWithOnlyFixedHeader(MqttMessage message) throws Exception {
         ByteBuf byteBuf = MqttEncoder.doEncode(ctx, message);
 
-        final List<Object> out = new LinkedList<Object>();
-        mqttDecoder.decode(ctx, byteBuf, out);
+        ArgumentCaptor<MqttMessage> captor = ArgumentCaptor.forClass(MqttMessage.class);
+        mqttDecoder.decode(ctx, byteBuf);
+        verify(ctx).fireChannelRead(captor.capture());
 
-        assertEquals("Expected one object but got " + out.size(), 1, out.size());
-
-        final MqttMessage decodedMessage = (MqttMessage) out.get(0);
+        final MqttMessage decodedMessage = captor.getValue();
         validateFixedHeaders(message.fixedHeader(), decodedMessage.fixedHeader());
     }
 
@@ -774,12 +750,11 @@ public class MqttCodecTest {
 
         ByteBuf byteBuf = MqttEncoder.doEncode(ctx, message);
 
-        final List<Object> out = new LinkedList<Object>();
-        mqttDecoder.decode(ctx, byteBuf, out);
+        ArgumentCaptor<MqttMessage> captor = ArgumentCaptor.forClass(MqttMessage.class);
+        mqttDecoder.decode(ctx, byteBuf);
+        verify(ctx).fireChannelRead(captor.capture());
 
-        assertEquals("Expected one object but got " + out.size(), 1, out.size());
-
-        final MqttMessage decodedMessage = (MqttMessage) out.get(0);
+        final MqttMessage decodedMessage = captor.getValue();
         validateFixedHeaders(message.fixedHeader(), decodedMessage.fixedHeader());
         validateMessageIdVariableHeader(
                 (MqttMessageIdVariableHeader) message.variableHeader(),
@@ -867,7 +842,7 @@ public class MqttCodecTest {
                 new MqttFixedHeader(MqttMessageType.SUBSCRIBE, false, MqttQoS.AT_LEAST_ONCE, true, 0);
         MqttMessageIdVariableHeader mqttMessageIdVariableHeader = MqttMessageIdVariableHeader.from(12345);
 
-        List<MqttTopicSubscription> topicSubscriptions = new LinkedList<MqttTopicSubscription>();
+        List<MqttTopicSubscription> topicSubscriptions = new LinkedList<>();
         topicSubscriptions.add(new MqttTopicSubscription("/abc", MqttQoS.AT_LEAST_ONCE));
         topicSubscriptions.add(new MqttTopicSubscription("/def", MqttQoS.AT_LEAST_ONCE));
         topicSubscriptions.add(new MqttTopicSubscription("/xyz", MqttQoS.EXACTLY_ONCE));
@@ -893,7 +868,7 @@ public class MqttCodecTest {
                 new MqttFixedHeader(MqttMessageType.UNSUBSCRIBE, false, MqttQoS.AT_LEAST_ONCE, true, 0);
         MqttMessageIdVariableHeader mqttMessageIdVariableHeader = MqttMessageIdVariableHeader.from(12345);
 
-        List<String> topics = new LinkedList<String>();
+        List<String> topics = new LinkedList<>();
         topics.add("/abc");
         topics.add("/def");
         topics.add("/xyz");

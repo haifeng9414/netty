@@ -51,7 +51,7 @@ public final class StompWebSocketClientPageHandler extends SimpleChannelInboundH
     }
 
     @Override
-    protected void channelRead0(ChannelHandlerContext ctx, FullHttpRequest request) {
+    protected void messageReceived(ChannelHandlerContext ctx, FullHttpRequest request) {
         if (request.headers().contains(HttpHeaderNames.UPGRADE, HttpHeaderValues.WEBSOCKET, true)) {
             ctx.fireChannelRead(request.retain());
             return;

@@ -46,7 +46,7 @@ public class DiscardClientHandler extends SimpleChannelInboundHandler<Object> {
     }
 
     @Override
-    public void channelRead0(ChannelHandlerContext ctx, Object msg) throws Exception {
+    public void messageReceived(ChannelHandlerContext ctx, Object msg) throws Exception {
         // Server is supposed to send nothing, but if it sends something, discard it.
     }
 
@@ -65,15 +65,12 @@ public class DiscardClientHandler extends SimpleChannelInboundHandler<Object> {
         ctx.writeAndFlush(content.retainedDuplicate()).addListener(trafficGenerator);
     }
 
-    private final ChannelFutureListener trafficGenerator = new ChannelFutureListener() {
-        @Override
-        public void operationComplete(ChannelFuture future) {
-            if (future.isSuccess()) {
-                generateTraffic();
-            } else {
-                future.cause().printStackTrace();
-                future.channel().close();
-            }
+    private final ChannelFutureListener trafficGenerator = future -> {
+        if (future.isSuccess()) {
+            generateTraffic();
+        } else {
+            future.cause().printStackTrace();
+            future.channel().close();
         }
     };
 }

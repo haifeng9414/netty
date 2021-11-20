@@ -15,13 +15,14 @@
  */
 package io.netty.handler.ssl;
 
+import static java.util.Objects.requireNonNull;
+
 import io.netty.channel.Channel;
+import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
-import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelPipeline;
 import io.netty.handler.codec.DecoderException;
-import io.netty.util.internal.ObjectUtil;
 import io.netty.util.internal.logging.InternalLogger;
 import io.netty.util.internal.logging.InternalLoggerFactory;
 
@@ -62,7 +63,7 @@ import javax.net.ssl.SSLException;
  * }
  * </pre>
  */
-public abstract class ApplicationProtocolNegotiationHandler extends ChannelInboundHandlerAdapter {
+public abstract class ApplicationProtocolNegotiationHandler implements ChannelHandler {
 
     private static final InternalLogger logger =
             InternalLoggerFactory.getInstance(ApplicationProtocolNegotiationHandler.class);
@@ -76,7 +77,7 @@ public abstract class ApplicationProtocolNegotiationHandler extends ChannelInbou
      *                         ALPN/NPN negotiation fails or the client does not support ALPN/NPN
      */
     protected ApplicationProtocolNegotiationHandler(String fallbackProtocol) {
-        this.fallbackProtocol = ObjectUtil.checkNotNull(fallbackProtocol, "fallbackProtocol");
+        this.fallbackProtocol = requireNonNull(fallbackProtocol, "fallbackProtocol");
     }
 
     @Override
@@ -102,14 +103,15 @@ public abstract class ApplicationProtocolNegotiationHandler extends ChannelInbou
             } catch (Throwable cause) {
                 exceptionCaught(ctx, cause);
             } finally {
+                ctx.fireUserEventTriggered(evt);
                 // Handshake failures are handled in exceptionCaught(...).
                 if (handshakeEvent.isSuccess()) {
                     removeSelfIfPresent(ctx);
                 }
             }
+        } else {
+            ctx.fireUserEventTriggered(evt);
         }
-
-        ctx.fireUserEventTriggered(evt);
     }
 
     private void removeSelfIfPresent(ChannelHandlerContext ctx) {

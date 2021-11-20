@@ -15,11 +15,12 @@
  */
 package io.netty.channel;
 
+import static java.util.Objects.requireNonNull;
+
 import io.netty.util.concurrent.CompleteFuture;
 import io.netty.util.concurrent.EventExecutor;
 import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.GenericFutureListener;
-import io.netty.util.internal.ObjectUtil;
 
 /**
  * A skeletal {@link ChannelFuture} implementation which represents a
@@ -36,11 +37,12 @@ abstract class CompleteChannelFuture extends CompleteFuture<Void> implements Cha
      */
     protected CompleteChannelFuture(Channel channel, EventExecutor executor) {
         super(executor);
-        this.channel = ObjectUtil.checkNotNull(channel, "channel");
+        requireNonNull(channel, "channel");
+        this.channel = channel;
     }
 
     @Override
-    protected EventExecutor executor() {
+    public EventExecutor executor() {
         EventExecutor e = super.executor();
         if (e == null) {
             return channel().eventLoop();

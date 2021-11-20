@@ -15,14 +15,15 @@
  */
 package io.netty.handler.codec.http.websocketx.extensions;
 
-import io.netty.channel.ChannelDuplexHandler;
+import static java.util.Objects.requireNonNull;
+
+import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPromise;
 import io.netty.handler.codec.CodecException;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpResponse;
-import io.netty.util.internal.ObjectUtil;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -39,7 +40,7 @@ import java.util.List;
  * Find a basic implementation for compression extensions at
  * <tt>io.netty.handler.codec.http.websocketx.extensions.compression.WebSocketClientCompressionHandler</tt>.
  */
-public class WebSocketClientExtensionHandler extends ChannelDuplexHandler {
+public class WebSocketClientExtensionHandler implements ChannelHandler {
 
     private final List<WebSocketClientExtensionHandshaker> extensionHandshakers;
 
@@ -51,7 +52,7 @@ public class WebSocketClientExtensionHandler extends ChannelDuplexHandler {
      *      with fallback configuration.
      */
     public WebSocketClientExtensionHandler(WebSocketClientExtensionHandshaker... extensionHandshakers) {
-        ObjectUtil.checkNotNull(extensionHandshakers, "extensionHandshakers");
+        requireNonNull(extensionHandshakers, "extensionHandshakers");
         if (extensionHandshakers.length == 0) {
             throw new IllegalArgumentException("extensionHandshakers must contains at least one handshaker");
         }
@@ -73,7 +74,7 @@ public class WebSocketClientExtensionHandler extends ChannelDuplexHandler {
             request.headers().set(HttpHeaderNames.SEC_WEBSOCKET_EXTENSIONS, headerValue);
         }
 
-        super.write(ctx, msg, promise);
+        ctx.write(msg, promise);
     }
 
     @Override
@@ -89,7 +90,7 @@ public class WebSocketClientExtensionHandler extends ChannelDuplexHandler {
                     List<WebSocketExtensionData> extensions =
                             WebSocketExtensionUtil.extractExtensions(extensionsHeader);
                     List<WebSocketClientExtension> validExtensions =
-                            new ArrayList<WebSocketClientExtension>(extensions.size());
+                            new ArrayList<>(extensions.size());
                     int rsv = 0;
 
                     for (WebSocketExtensionData extensionData : extensions) {
@@ -119,12 +120,13 @@ public class WebSocketClientExtensionHandler extends ChannelDuplexHandler {
                         ctx.pipeline().addAfter(ctx.name(), encoder.getClass().getName(), encoder);
                     }
                 }
-
-                ctx.pipeline().remove(ctx.name());
+                ctx.fireChannelRead(msg);
+                ctx.pipeline().remove(this);
+                return;
             }
         }
 
-        super.channelRead(ctx, msg);
+        ctx.fireChannelRead(msg);
     }
 }
 

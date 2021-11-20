@@ -141,7 +141,7 @@ public class SocketFixedLengthEchoTest extends AbstractSocketTest {
     private static class EchoHandler extends SimpleChannelInboundHandler<ByteBuf> {
         private final boolean autoRead;
         volatile Channel channel;
-        final AtomicReference<Throwable> exception = new AtomicReference<Throwable>();
+        final AtomicReference<Throwable> exception = new AtomicReference<>();
         volatile int counter;
 
         EchoHandler(boolean autoRead) {
@@ -157,7 +157,7 @@ public class SocketFixedLengthEchoTest extends AbstractSocketTest {
         }
 
         @Override
-        public void channelRead0(ChannelHandlerContext ctx, ByteBuf msg) throws Exception {
+        public void messageReceived(ChannelHandlerContext ctx, ByteBuf msg) throws Exception {
             assertEquals(1024, msg.readableBytes());
 
             byte[] actual = new byte[msg.readableBytes()];

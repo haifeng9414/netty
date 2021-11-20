@@ -27,7 +27,6 @@ import java.nio.channels.FileChannel;
 import java.nio.channels.GatheringByteChannel;
 import java.nio.channels.ScatteringByteChannel;
 
-
 /**
  * Read-only ByteBuf which wraps a read-only ByteBuffer.
  */

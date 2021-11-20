@@ -15,6 +15,8 @@
  */
 package io.netty.handler.codec.compression;
 
+import static java.util.Objects.requireNonNull;
+
 import com.jcraft.jzlib.Deflater;
 import com.jcraft.jzlib.JZlib;
 import io.netty.buffer.ByteBuf;
@@ -26,7 +28,6 @@ import io.netty.channel.ChannelPromise;
 import io.netty.channel.ChannelPromiseNotifier;
 import io.netty.util.concurrent.EventExecutor;
 import io.netty.util.internal.EmptyArrays;
-import io.netty.util.internal.ObjectUtil;
 
 import java.util.concurrent.TimeUnit;
 
@@ -131,7 +132,7 @@ public class JZlibEncoder extends ZlibEncoder {
             throw new IllegalArgumentException(
                     "memLevel: " + memLevel + " (expected: 1-9)");
         }
-        ObjectUtil.checkNotNull(wrapper, "wrapper");
+        requireNonNull(wrapper, "wrapper");
         if (wrapper == ZlibWrapper.ZLIB_OR_NONE) {
             throw new IllegalArgumentException(
                     "wrapper '" + ZlibWrapper.ZLIB_OR_NONE + "' is not " +
@@ -219,8 +220,7 @@ public class JZlibEncoder extends ZlibEncoder {
             throw new IllegalArgumentException(
                     "memLevel: " + memLevel + " (expected: 1-9)");
         }
-        ObjectUtil.checkNotNull(dictionary, "dictionary");
-
+        requireNonNull(dictionary, "dictionary");
         int resultCode;
         resultCode = z.deflateInit(
                 compressionLevel, windowBits, memLevel,
@@ -250,12 +250,9 @@ public class JZlibEncoder extends ZlibEncoder {
             return finishEncode(ctx, promise);
         } else {
             final ChannelPromise p = ctx.newPromise();
-            executor.execute(new Runnable() {
-                @Override
-                public void run() {
-                    ChannelFuture f = finishEncode(ctx(), p);
-                    f.addListener(new ChannelPromiseNotifier(promise));
-                }
+            executor.execute(() -> {
+                ChannelFuture f = finishEncode(ctx(), p);
+                f.addListener(new ChannelPromiseNotifier(promise));
             });
             return p;
         }
@@ -340,20 +337,12 @@ public class JZlibEncoder extends ZlibEncoder {
             final ChannelHandlerContext ctx,
             final ChannelPromise promise) {
         ChannelFuture f = finishEncode(ctx, ctx.newPromise());
-        f.addListener(new ChannelFutureListener() {
-            @Override
-            public void operationComplete(ChannelFuture f) throws Exception {
-                ctx.close(promise);
-            }
-        });
+        f.addListener((ChannelFutureListener) f1 -> ctx.close(promise));
 
         if (!f.isDone()) {
             // Ensure the channel is closed even if the write operation completes in time.
-            ctx.executor().schedule(new Runnable() {
-                @Override
-                public void run() {
-                    ctx.close(promise);
-                }
+            ctx.executor().schedule(() -> {
+                ctx.close(promise);
             }, 10, TimeUnit.SECONDS); // FIXME: Magic number
         }
     }

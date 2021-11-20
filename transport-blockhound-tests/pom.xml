@@ -20,7 +20,11 @@
   <parent>
     <groupId>io.netty</groupId>
     <artifactId>netty-parent</artifactId>
+<<<<<<<< HEAD:transport-blockhound-tests/pom.xml
+    <version>5.0.0.Final-SNAPSHOT</version>
+========
     <version>4.1.53.Final-SNAPSHOT</version>
+>>>>>>>> netty/master:transport-udt/pom.xml
   </parent>
 
   <artifactId>netty-transport-blockhound-tests</artifactId>
@@ -63,7 +67,16 @@
   <dependencies>
     <dependency>
       <groupId>${project.groupId}</groupId>
+<<<<<<<< HEAD:transport-blockhound-tests/pom.xml
       <artifactId>netty-transport</artifactId>
+========
+      <artifactId>netty-common</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>${project.groupId}</groupId>
+      <artifactId>netty-buffer</artifactId>
+>>>>>>>> netty/master:transport-udt/pom.xml
       <version>${project.version}</version>
     </dependency>
     <dependency>
@@ -89,4 +102,20 @@
       <scope>test</scope>
     </dependency>
   </dependencies>
+<<<<<<<< HEAD:transport-blockhound-tests/pom.xml
+========
+
+  <build>
+    <plugins>
+      <!-- run each test in separate JVM -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-surefire-plugin</artifactId>
+        <configuration>
+          <reuseForks>false</reuseForks>
+        </configuration>
+      </plugin>
+    </plugins>
+  </build>
+>>>>>>>> netty/master:transport-udt/pom.xml
 </project>

@@ -20,7 +20,7 @@ import io.netty.buffer.ByteBufUtil;
 import io.netty.buffer.Unpooled;
 import io.netty.util.IllegalReferenceCountException;
 
-import static io.netty.util.internal.ObjectUtil.checkNotNull;
+import static java.util.Objects.requireNonNull;
 
 /**
  * Default implementation of a {@link FullHttpResponse}.
@@ -60,7 +60,7 @@ public class DefaultFullHttpResponse extends DefaultHttpResponse implements Full
     public DefaultFullHttpResponse(HttpVersion version, HttpResponseStatus status,
                                    ByteBuf content, boolean validateHeaders, boolean singleFieldHeaders) {
         super(version, status, validateHeaders, singleFieldHeaders);
-        this.content = checkNotNull(content, "content");
+        this.content = requireNonNull(content, "content");
         this.trailingHeaders = singleFieldHeaders ? new CombinedHttpHeaders(validateHeaders)
                                                   : new DefaultHttpHeaders(validateHeaders);
     }
@@ -68,8 +68,8 @@ public class DefaultFullHttpResponse extends DefaultHttpResponse implements Full
     public DefaultFullHttpResponse(HttpVersion version, HttpResponseStatus status,
             ByteBuf content, HttpHeaders headers, HttpHeaders trailingHeaders) {
         super(version, status, headers);
-        this.content = checkNotNull(content, "content");
-        this.trailingHeaders = checkNotNull(trailingHeaders, "trailingHeaders");
+        this.content = requireNonNull(content, "content");
+        this.trailingHeaders = requireNonNull(trailingHeaders, "trailingHeaders");
     }
 
     @Override

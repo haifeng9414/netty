@@ -22,6 +22,7 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPromise;
 import io.netty.channel.DefaultChannelPromise;
 import io.netty.handler.codec.http.HttpResponseStatus;
+import io.netty.util.concurrent.ImmediateEventExecutor;
 import junit.framework.AssertionFailedError;
 import org.junit.Before;
 import org.junit.Test;
@@ -126,7 +127,7 @@ public class DefaultHttp2ConnectionDecoderTest {
     public void setup() throws Exception {
         MockitoAnnotations.initMocks(this);
 
-        promise = new DefaultChannelPromise(channel);
+        promise = new DefaultChannelPromise(channel, ImmediateEventExecutor.INSTANCE);
 
         final AtomicInteger headersReceivedState = new AtomicInteger();
         when(channel.isActive()).thenReturn(true);
@@ -134,52 +135,38 @@ public class DefaultHttp2ConnectionDecoderTest {
         when(stream.state()).thenReturn(OPEN);
         when(stream.open(anyBoolean())).thenReturn(stream);
         when(pushStream.id()).thenReturn(PUSH_STREAM_ID);
-        doAnswer(new Answer<Boolean>() {
-            @Override
-            public Boolean answer(InvocationOnMock in) throws Throwable {
-                return (headersReceivedState.get() & STATE_RECV_HEADERS) != 0;
-            }
-        }).when(stream).isHeadersReceived();
-        doAnswer(new Answer<Boolean>() {
-            @Override
-            public Boolean answer(InvocationOnMock in) throws Throwable {
-                return (headersReceivedState.get() & STATE_RECV_TRAILERS) != 0;
-            }
-        }).when(stream).isTrailersReceived();
-        doAnswer(new Answer<Http2Stream>() {
-            @Override
-            public Http2Stream answer(InvocationOnMock in) throws Throwable {
-                boolean isInformational = in.getArgument(0);
-                if (isInformational) {
-                    return stream;
-                }
-                for (;;) {
-                    int current = headersReceivedState.get();
-                    int next = current;
-                    if ((current & STATE_RECV_HEADERS) != 0) {
-                        if ((current & STATE_RECV_TRAILERS) != 0) {
-                            throw new IllegalStateException("already sent headers!");
-                        }
-                        next |= STATE_RECV_TRAILERS;
-                    } else {
-                        next |= STATE_RECV_HEADERS;
-                    }
-                    if (headersReceivedState.compareAndSet(current, next)) {
-                        break;
-                    }
-                }
+        doAnswer((Answer<Boolean>) in ->
+                (headersReceivedState.get() & STATE_RECV_HEADERS) != 0).when(stream).isHeadersReceived();
+        doAnswer((Answer<Boolean>) in ->
+                (headersReceivedState.get() & STATE_RECV_TRAILERS) != 0).when(stream).isTrailersReceived();
+        doAnswer((Answer<Http2Stream>) in -> {
+            boolean isInformational = in.getArgument(0);
+            if (isInformational) {
                 return stream;
             }
-        }).when(stream).headersReceived(anyBoolean());
-        doAnswer(new Answer<Http2Stream>() {
-            @Override
-            public Http2Stream answer(InvocationOnMock in) throws Throwable {
-                Http2StreamVisitor visitor = in.getArgument(0);
-                if (!visitor.visit(stream)) {
-                    return stream;
+            for (;;) {
+                int current = headersReceivedState.get();
+                int next = current;
+                if ((current & STATE_RECV_HEADERS) != 0) {
+                    if ((current & STATE_RECV_TRAILERS) != 0) {
+                        throw new IllegalStateException("already sent headers!");
+                    }
+                    next |= STATE_RECV_TRAILERS;
+                } else {
+                    next |= STATE_RECV_HEADERS;
                 }
-                return null;
+                if (headersReceivedState.compareAndSet(current, next)) {
+                    break;
+                }
             }
+            return stream;
+        }).when(stream).headersReceived(anyBoolean());
+        doAnswer((Answer<Http2Stream>) in -> {
+            Http2StreamVisitor visitor = in.getArgument(0);
+            if (!visitor.visit(stream)) {
+                return stream;
+            }
+            return null;
         }).when(connection).forEachActiveStream(any(Http2StreamVisitor.class));
         when(connection.stream(STREAM_ID)).thenReturn(stream);
         when(connection.streamMayHaveExisted(STREAM_ID)).thenReturn(true);
@@ -421,30 +408,19 @@ public class DefaultHttp2ConnectionDecoderTest {
         final ByteBuf data = dummyData();
         final int padding = 10;
         final AtomicInteger unprocessed = new AtomicInteger(data.readableBytes() + padding);
-        doAnswer(new Answer<Integer>() {
-            @Override
-            public Integer answer(InvocationOnMock in) throws Throwable {
-                return unprocessed.get();
+        doAnswer((Answer<Integer>) in -> unprocessed.get()).when(localFlow).unconsumedBytes(eq(stream));
+        doAnswer((Answer<Void>) in -> {
+            int delta = (Integer) in.getArguments()[1];
+            int newValue = unprocessed.addAndGet(-delta);
+            if (newValue < 0) {
+                throw new RuntimeException("Returned too many bytes");
             }
-        }).when(localFlow).unconsumedBytes(eq(stream));
-        doAnswer(new Answer<Void>() {
-            @Override
-            public Void answer(InvocationOnMock in) throws Throwable {
-                int delta = (Integer) in.getArguments()[1];
-                int newValue = unprocessed.addAndGet(-delta);
-                if (newValue < 0) {
-                    throw new RuntimeException("Returned too many bytes");
-                }
-                return null;
-            }
+            return null;
         }).when(localFlow).consumeBytes(eq(stream), anyInt());
         // When the listener callback is called, process a few bytes and then throw.
-        doAnswer(new Answer<Integer>() {
-            @Override
-            public Integer answer(InvocationOnMock in) throws Throwable {
-                localFlow.consumeBytes(stream, 4);
-                throw new RuntimeException("Fake Exception");
-            }
+        doAnswer((Answer<Integer>) in -> {
+            localFlow.consumeBytes(stream, 4);
+            throw new RuntimeException("Fake Exception");
         }).when(listener).onDataRead(eq(ctx), eq(STREAM_ID), any(ByteBuf.class), eq(10), eq(true));
         try {
             decode().onDataRead(ctx, STREAM_ID, data, padding, true);
@@ -784,17 +760,13 @@ public class DefaultHttp2ConnectionDecoderTest {
     private Http2FrameListener decode() throws Exception {
         ArgumentCaptor<Http2FrameListener> internalListener = ArgumentCaptor.forClass(Http2FrameListener.class);
         doNothing().when(reader).readFrame(eq(ctx), any(ByteBuf.class), internalListener.capture());
-        decoder.decodeFrame(ctx, EMPTY_BUFFER, Collections.emptyList());
+        decoder.decodeFrame(ctx, EMPTY_BUFFER);
         return internalListener.getValue();
     }
 
     private void mockFlowControl(final int processedBytes) throws Http2Exception {
-        doAnswer(new Answer<Integer>() {
-            @Override
-            public Integer answer(InvocationOnMock invocation) throws Throwable {
-                return processedBytes;
-            }
-        }).when(listener).onDataRead(any(ChannelHandlerContext.class), anyInt(),
+        doAnswer((Answer<Integer>) invocation ->
+                processedBytes).when(listener).onDataRead(any(ChannelHandlerContext.class), anyInt(),
                 any(ByteBuf.class), anyInt(), anyBoolean());
     }
 

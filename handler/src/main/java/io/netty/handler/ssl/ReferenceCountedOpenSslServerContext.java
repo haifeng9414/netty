@@ -21,8 +21,6 @@ import io.netty.internal.tcnative.SSL;
 import io.netty.internal.tcnative.SSLContext;
 import io.netty.internal.tcnative.SniHostNameMatcher;
 import io.netty.util.CharsetUtil;
-import io.netty.util.internal.PlatformDependent;
-import io.netty.util.internal.SuppressJava6Requirement;
 import io.netty.util.internal.SystemPropertyUtil;
 import io.netty.util.internal.logging.InternalLogger;
 import io.netty.util.internal.logging.InternalLoggerFactory;
@@ -36,7 +34,7 @@ import javax.net.ssl.TrustManagerFactory;
 import javax.net.ssl.X509ExtendedTrustManager;
 import javax.net.ssl.X509TrustManager;
 
-import static io.netty.util.internal.ObjectUtil.checkNotNull;
+import static java.util.Objects.requireNonNull;
 
 /**
  * A server-side {@link SslContext} which uses OpenSSL's SSL/TLS implementation.
@@ -107,12 +105,12 @@ public final class ReferenceCountedOpenSslServerContext extends ReferenceCounted
         try {
             try {
                 SSLContext.setVerify(ctx, SSL.SSL_CVERIFY_NONE, VERIFY_DEPTH);
-                if (!OpenSsl.useKeyManagerFactory()) {
+                if (!OpenSsl.supportsKeyManagerFactory()) {
                     if (keyManagerFactory != null) {
                         throw new IllegalArgumentException(
                                 "KeyManagerFactory not supported");
                     }
-                    checkNotNull(keyCertChain, "keyCertChain");
+                    requireNonNull(keyCertChain, "keyCertChain");
 
                     setKeyMaterial(ctx, keyCertChain, key, keyPassword);
                 } else {
@@ -155,7 +153,13 @@ public final class ReferenceCountedOpenSslServerContext extends ReferenceCounted
                 //
                 //            See https://github.com/netty/netty/issues/5372
 
-                setVerifyCallback(ctx, engineMap, manager);
+                // Use this to prevent an error when running on java < 7
+                if (useExtendedTrustManager(manager)) {
+                    SSLContext.setCertVerifyCallback(ctx, new ExtendedTrustManagerVerifyCallback(
+                            engineMap, (X509ExtendedTrustManager) manager));
+                } else {
+                    SSLContext.setCertVerifyCallback(ctx, new TrustManagerVerifyCallback(engineMap, manager));
+                }
 
                 X509Certificate[] issuers = manager.getAcceptedIssuers();
                 if (issuers != null && issuers.length > 0) {
@@ -170,13 +174,10 @@ public final class ReferenceCountedOpenSslServerContext extends ReferenceCounted
                     }
                 }
 
-                if (PlatformDependent.javaVersion() >= 8) {
-                    // Only do on Java8+ as SNIMatcher is not supported in earlier releases.
-                    // IMPORTANT: The callbacks set for hostname matching must be static to prevent memory leak as
-                    //            otherwise the context can never be collected. This is because the JNI code holds
-                    //            a global reference to the matcher.
-                    SSLContext.setSniHostnameMatcher(ctx, new OpenSslSniHostnameMatcher(engineMap));
-                }
+                // IMPORTANT: The callbacks set for hostname matching must be static to prevent memory leak as
+                //            otherwise the context can never be collected. This is because the JNI code holds
+                //            a global reference to the matcher.
+                SSLContext.setSniHostnameMatcher(ctx, new OpenSslSniHostnameMatcher(engineMap));
             } catch (SSLException e) {
                 throw e;
             } catch (Exception e) {
@@ -193,17 +194,6 @@ public final class ReferenceCountedOpenSslServerContext extends ReferenceCounted
             if (keyMaterialProvider != null) {
                 keyMaterialProvider.destroy();
             }
-        }
-    }
-
-    @SuppressJava6Requirement(reason = "Guarded by java version check")
-    private static void setVerifyCallback(long ctx, OpenSslEngineMap engineMap, X509TrustManager manager) {
-        // Use this to prevent an error when running on java < 7
-        if (useExtendedTrustManager(manager)) {
-            SSLContext.setCertVerifyCallback(ctx, new ExtendedTrustManagerVerifyCallback(
-                    engineMap, (X509ExtendedTrustManager) manager));
-        } else {
-            SSLContext.setCertVerifyCallback(ctx, new TrustManagerVerifyCallback(engineMap, manager));
         }
     }
 
@@ -228,12 +218,8 @@ public final class ReferenceCountedOpenSslServerContext extends ReferenceCounted
                 // OpenJDK SSLEngineImpl does.
                 keyManagerHolder.setKeyMaterialServerSide(engine);
             } catch (Throwable cause) {
+                logger.debug("Failed to set the server-side key material", cause);
                 engine.initHandshakeException(cause);
-
-                if (cause instanceof Exception) {
-                    throw (Exception) cause;
-                }
-                throw new SSLException(cause);
             }
         }
     }
@@ -253,7 +239,6 @@ public final class ReferenceCountedOpenSslServerContext extends ReferenceCounted
         }
     }
 
-    @SuppressJava6Requirement(reason = "Usage guarded by java version check")
     private static final class ExtendedTrustManagerVerifyCallback extends AbstractCertificateVerifier {
         private final X509ExtendedTrustManager manager;
 

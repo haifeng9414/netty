@@ -15,8 +15,9 @@
  */
 package io.netty.handler.codec.socks;
 
+import static java.util.Objects.requireNonNull;
+
 import io.netty.buffer.ByteBuf;
-import io.netty.util.internal.ObjectUtil;
 
 /**
  * An abstract class that defines a SocksMessage, providing common properties for
@@ -31,7 +32,8 @@ public abstract class SocksMessage {
     private final SocksProtocolVersion protocolVersion = SocksProtocolVersion.SOCKS5;
 
     protected SocksMessage(SocksMessageType type) {
-        this.type = ObjectUtil.checkNotNull(type, "type");
+        requireNonNull(type, "type");
+        this.type = type;
     }
 
     /**

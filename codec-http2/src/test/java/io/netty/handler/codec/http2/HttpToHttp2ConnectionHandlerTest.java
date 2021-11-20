@@ -20,14 +20,15 @@ import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
+import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
-import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelPipeline;
 import io.netty.channel.ChannelPromise;
-import io.netty.channel.DefaultEventLoopGroup;
+import io.netty.channel.MultithreadEventLoopGroup;
 import io.netty.channel.local.LocalAddress;
 import io.netty.channel.local.LocalChannel;
+import io.netty.channel.local.LocalHandler;
 import io.netty.channel.local.LocalServerChannel;
 import io.netty.handler.codec.http.DefaultFullHttpRequest;
 import io.netty.handler.codec.http.DefaultHttpContent;
@@ -335,13 +336,10 @@ public class HttpToHttp2ConnectionHandlerTest {
     @Test
     public void testRequestWithBody() throws Exception {
         final String text = "foooooogoooo";
-        final List<String> receivedBuffers = Collections.synchronizedList(new ArrayList<String>());
-        doAnswer(new Answer<Void>() {
-            @Override
-            public Void answer(InvocationOnMock in) throws Throwable {
-                receivedBuffers.add(((ByteBuf) in.getArguments()[2]).toString(UTF_8));
-                return null;
-            }
+        final List<String> receivedBuffers = Collections.synchronizedList(new ArrayList<>());
+        doAnswer((Answer<Void>) in -> {
+            receivedBuffers.add(((ByteBuf) in.getArguments()[2]).toString(UTF_8));
+            return null;
         }).when(serverListener).onDataRead(any(ChannelHandlerContext.class), eq(3),
                 any(ByteBuf.class), eq(0), eq(true));
         bootstrapEnv(3, 1, 0);
@@ -378,13 +376,10 @@ public class HttpToHttp2ConnectionHandlerTest {
     @Test
     public void testRequestWithBodyAndTrailingHeaders() throws Exception {
         final String text = "foooooogoooo";
-        final List<String> receivedBuffers = Collections.synchronizedList(new ArrayList<String>());
-        doAnswer(new Answer<Void>() {
-            @Override
-            public Void answer(InvocationOnMock in) throws Throwable {
-                receivedBuffers.add(((ByteBuf) in.getArguments()[2]).toString(UTF_8));
-                return null;
-            }
+        final List<String> receivedBuffers = Collections.synchronizedList(new ArrayList<>());
+        doAnswer((Answer<Void>) in -> {
+            receivedBuffers.add(((ByteBuf) in.getArguments()[2]).toString(UTF_8));
+            return null;
         }).when(serverListener).onDataRead(any(ChannelHandlerContext.class), eq(3),
                 any(ByteBuf.class), eq(0), eq(false));
         bootstrapEnv(4, 1, 1);
@@ -430,13 +425,10 @@ public class HttpToHttp2ConnectionHandlerTest {
     public void testChunkedRequestWithBodyAndTrailingHeaders() throws Exception {
         final String text = "foooooo";
         final String text2 = "goooo";
-        final List<String> receivedBuffers = Collections.synchronizedList(new ArrayList<String>());
-        doAnswer(new Answer<Void>() {
-            @Override
-            public Void answer(InvocationOnMock in) throws Throwable {
-                receivedBuffers.add(((ByteBuf) in.getArguments()[2]).toString(UTF_8));
-                return null;
-            }
+        final List<String> receivedBuffers = Collections.synchronizedList(new ArrayList<>());
+        doAnswer((Answer<Void>) in -> {
+            receivedBuffers.add(((ByteBuf) in.getArguments()[2]).toString(UTF_8));
+            return null;
         }).when(serverListener).onDataRead(any(ChannelHandlerContext.class), eq(3),
                 any(ByteBuf.class), eq(0), eq(false));
         bootstrapEnv(4, 1, 1);
@@ -508,7 +500,7 @@ public class HttpToHttp2ConnectionHandlerTest {
         sb = new ServerBootstrap();
         cb = new Bootstrap();
 
-        sb.group(new DefaultEventLoopGroup());
+        sb.group(new MultithreadEventLoopGroup(LocalHandler.newFactory()));
         sb.channel(LocalServerChannel.class);
         sb.childHandler(new ChannelInitializer<Channel>() {
             @Override
@@ -525,7 +517,7 @@ public class HttpToHttp2ConnectionHandlerTest {
             }
         });
 
-        cb.group(new DefaultEventLoopGroup());
+        cb.group(new MultithreadEventLoopGroup(LocalHandler.newFactory()));
         cb.channel(LocalChannel.class);
         cb.handler(new ChannelInitializer<Channel>() {
             @Override
@@ -537,7 +529,7 @@ public class HttpToHttp2ConnectionHandlerTest {
                         .gracefulShutdownTimeoutMillis(0)
                         .build();
                 p.addLast(handler);
-                p.addLast(new ChannelInboundHandlerAdapter() {
+                p.addLast(new ChannelHandler() {
                     @Override
                     public void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws Exception {
                         if (evt == Http2ConnectionPrefaceAndSettingsFrameWrittenEvent.INSTANCE) {

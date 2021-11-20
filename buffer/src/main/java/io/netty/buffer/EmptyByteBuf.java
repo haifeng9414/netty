@@ -17,10 +17,10 @@
 package io.netty.buffer;
 
 import static io.netty.util.internal.ObjectUtil.checkPositiveOrZero;
+import static java.util.Objects.requireNonNull;
 
 import io.netty.util.ByteProcessor;
 import io.netty.util.internal.EmptyArrays;
-import io.netty.util.internal.ObjectUtil;
 import io.netty.util.internal.PlatformDependent;
 import io.netty.util.internal.StringUtil;
 
@@ -65,7 +65,9 @@ public final class EmptyByteBuf extends ByteBuf {
     }
 
     private EmptyByteBuf(ByteBufAllocator alloc, ByteOrder order) {
-        this.alloc = ObjectUtil.checkNotNull(alloc, "alloc");
+        requireNonNull(alloc, "alloc");
+
+        this.alloc = alloc;
         this.order = order;
         str = StringUtil.simpleClassName(this) + (order == ByteOrder.BIG_ENDIAN? "BE" : "LE");
     }
@@ -117,7 +119,8 @@ public final class EmptyByteBuf extends ByteBuf {
 
     @Override
     public ByteBuf order(ByteOrder endianness) {
-        if (ObjectUtil.checkNotNull(endianness, "endianness") == order()) {
+        requireNonNull(endianness, "endianness");
+        if (endianness == order()) {
             return this;
         }
 
@@ -184,26 +187,6 @@ public final class EmptyByteBuf extends ByteBuf {
 
     @Override
     public ByteBuf clear() {
-        return this;
-    }
-
-    @Override
-    public ByteBuf markReaderIndex() {
-        return this;
-    }
-
-    @Override
-    public ByteBuf resetReaderIndex() {
-        return this;
-    }
-
-    @Override
-    public ByteBuf markWriterIndex() {
-        return this;
-    }
-
-    @Override
-    public ByteBuf resetWriterIndex() {
         return this;
     }
 

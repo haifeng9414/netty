@@ -16,8 +16,6 @@
 package io.netty.buffer;
 
 import io.netty.util.ReferenceCountUtil;
-import io.netty.util.internal.ObjectUtil;
-import io.netty.util.internal.PlatformDependent;
 import org.junit.Assume;
 import org.junit.Test;
 
@@ -29,6 +27,8 @@ import java.util.ConcurrentModificationException;
 import java.util.Iterator;
 import java.util.List;
 import java.util.NoSuchElementException;
+import java.util.Objects;
+import java.util.concurrent.ThreadLocalRandom;
 
 import static io.netty.buffer.Unpooled.EMPTY_BUFFER;
 import static io.netty.buffer.Unpooled.buffer;
@@ -58,14 +58,14 @@ public abstract class AbstractCompositeByteBufTest extends AbstractByteBufTest {
     private final ByteOrder order;
 
     protected AbstractCompositeByteBufTest(ByteOrder order) {
-        this.order = ObjectUtil.checkNotNull(order, "order");
+        this.order = Objects.requireNonNull(order, "order");
     }
 
     @Override
     protected ByteBuf newBuffer(int length, int maxCapacity) {
         Assume.assumeTrue(maxCapacity == Integer.MAX_VALUE);
 
-        List<ByteBuf> buffers = new ArrayList<ByteBuf>();
+        List<ByteBuf> buffers = new ArrayList<>();
         for (int i = 0; i < length + 45; i += 45) {
             buffers.add(EMPTY_BUFFER);
             buffers.add(wrappedBuffer(new byte[1]));
@@ -200,17 +200,13 @@ public abstract class AbstractCompositeByteBufTest extends AbstractByteBufTest {
                 wrappedBuffer(new byte[] { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 }, 0, 5).order(order),
                 wrappedBuffer(new byte[] { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 }, 5, 5).order(order));
         a.skipBytes(6);
-        a.markReaderIndex();
         b.skipBytes(6);
-        b.markReaderIndex();
         assertEquals(a.readerIndex(), b.readerIndex());
         a.readerIndex(a.readerIndex() - 1);
         b.readerIndex(b.readerIndex() - 1);
         assertEquals(a.readerIndex(), b.readerIndex());
         a.writerIndex(a.writerIndex() - 1);
-        a.markWriterIndex();
         b.writerIndex(b.writerIndex() - 1);
-        b.markWriterIndex();
         assertEquals(a.writerIndex(), b.writerIndex());
         a.writerIndex(a.writerIndex() + 1);
         b.writerIndex(b.writerIndex() + 1);
@@ -222,12 +218,6 @@ public abstract class AbstractCompositeByteBufTest extends AbstractByteBufTest {
         assertEquals(a.readerIndex(), b.readerIndex());
         assertEquals(a.writerIndex(), b.writerIndex());
         assertTrue(ByteBufUtil.equals(a, b));
-        a.resetReaderIndex();
-        b.resetReaderIndex();
-        assertEquals(a.readerIndex(), b.readerIndex());
-        a.resetWriterIndex();
-        b.resetWriterIndex();
-        assertEquals(a.writerIndex(), b.writerIndex());
         assertTrue(ByteBufUtil.equals(a, b));
 
         a.release();
@@ -726,7 +716,7 @@ public abstract class AbstractCompositeByteBufTest extends AbstractByteBufTest {
         CompositeByteBuf buf = compositeBuffer();
         assertThat(buf.refCnt(), is(1));
 
-        List<ByteBuf> components = new ArrayList<ByteBuf>();
+        List<ByteBuf> components = new ArrayList<>();
         Collections.addAll(components, c1, c2, c3);
         buf.addComponents(components);
 
@@ -1443,7 +1433,7 @@ public abstract class AbstractCompositeByteBufTest extends AbstractByteBufTest {
 
     private void testDecompose(int offset, int length, int expectedListSize) {
         byte[] bytes = new byte[1024];
-        PlatformDependent.threadLocalRandom().nextBytes(bytes);
+        ThreadLocalRandom.current().nextBytes(bytes);
         ByteBuf buf = wrappedBuffer(bytes);
 
         CompositeByteBuf composite = newCompositeBuffer();

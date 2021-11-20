@@ -21,16 +21,15 @@ import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelConfig;
-import io.netty.channel.ChannelDuplexHandler;
 import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
-import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelOption;
 import io.netty.channel.ChannelPipeline;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.embedded.EmbeddedChannel;
-import io.netty.channel.nio.NioEventLoopGroup;
+import io.netty.channel.MultithreadEventLoopGroup;
+import io.netty.channel.nio.NioHandler;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.handler.codec.ByteToMessageDecoder;
@@ -42,7 +41,6 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 
 import java.net.SocketAddress;
-import java.util.List;
 import java.util.Queue;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Exchanger;
@@ -57,7 +55,7 @@ public class FlowControlHandlerTest {
 
     @BeforeClass
     public static void init() {
-        GROUP = new NioEventLoopGroup();
+        GROUP = new MultithreadEventLoopGroup(NioHandler.newFactory());
     }
 
     @AfterClass
@@ -99,7 +97,7 @@ public class FlowControlHandlerTest {
         bootstrap.group(GROUP)
             .channel(NioSocketChannel.class)
             .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, 1000)
-            .handler(new ChannelInboundHandlerAdapter() {
+            .handler(new ChannelHandler() {
                 @Override
                 public void channelRead(ChannelHandlerContext ctx, Object msg) {
                     fail("In this test the client is never receiving a message from the server.");
@@ -124,7 +122,7 @@ public class FlowControlHandlerTest {
     public void testAutoReadingOn() throws Exception {
         final CountDownLatch latch = new CountDownLatch(3);
 
-        ChannelInboundHandlerAdapter handler = new ChannelInboundHandlerAdapter() {
+        ChannelHandler handler = new ChannelHandler() {
             @Override
             public void channelRead(ChannelHandlerContext ctx, Object msg) {
                 ReferenceCountUtil.release(msg);
@@ -163,10 +161,10 @@ public class FlowControlHandlerTest {
      */
     @Test
     public void testAutoReadingOff() throws Exception {
-        final Exchanger<Channel> peerRef = new Exchanger<Channel>();
+        final Exchanger<Channel> peerRef = new Exchanger<>();
         final CountDownLatch latch = new CountDownLatch(3);
 
-        ChannelInboundHandlerAdapter handler = new ChannelInboundHandlerAdapter() {
+        ChannelHandler handler = new ChannelHandler() {
             @Override
             public void channelActive(ChannelHandlerContext ctx) throws Exception {
                 peerRef.exchange(ctx.channel(), 1L, SECONDS);
@@ -212,7 +210,7 @@ public class FlowControlHandlerTest {
     public void testFlowAutoReadOn() throws Exception {
         final CountDownLatch latch = new CountDownLatch(3);
 
-        ChannelInboundHandlerAdapter handler = new ChannelDuplexHandler() {
+        ChannelHandler handler = new ChannelHandler() {
             @Override
             public void channelRead(ChannelHandlerContext ctx, Object msg) {
                 latch.countDown();
@@ -242,14 +240,14 @@ public class FlowControlHandlerTest {
      */
     @Test
     public void testFlowToggleAutoRead() throws Exception {
-        final Exchanger<Channel> peerRef = new Exchanger<Channel>();
+        final Exchanger<Channel> peerRef = new Exchanger<>();
         final CountDownLatch msgRcvLatch1 = new CountDownLatch(1);
         final CountDownLatch msgRcvLatch2 = new CountDownLatch(1);
         final CountDownLatch msgRcvLatch3 = new CountDownLatch(1);
         final CountDownLatch setAutoReadLatch1 = new CountDownLatch(1);
         final CountDownLatch setAutoReadLatch2 = new CountDownLatch(1);
 
-        ChannelInboundHandlerAdapter handler = new ChannelInboundHandlerAdapter() {
+        ChannelHandler handler = new ChannelHandler() {
             private int msgRcvCount;
             private int expectedMsgCount;
             @Override
@@ -324,12 +322,12 @@ public class FlowControlHandlerTest {
      */
     @Test
     public void testFlowAutoReadOff() throws Exception {
-        final Exchanger<Channel> peerRef = new Exchanger<Channel>();
+        final Exchanger<Channel> peerRef = new Exchanger<>();
         final CountDownLatch msgRcvLatch1 = new CountDownLatch(1);
         final CountDownLatch msgRcvLatch2 = new CountDownLatch(2);
         final CountDownLatch msgRcvLatch3 = new CountDownLatch(3);
 
-        ChannelInboundHandlerAdapter handler = new ChannelDuplexHandler() {
+        ChannelHandler handler = new ChannelHandler() {
             @Override
             public void channelActive(ChannelHandlerContext ctx) throws Exception {
                 ctx.fireChannelActive();
@@ -378,7 +376,7 @@ public class FlowControlHandlerTest {
         final Exchanger<Channel> peerRef = new Exchanger<Channel>();
         final CountDownLatch latch = new CountDownLatch(3);
         final AtomicReference<Throwable> causeRef = new AtomicReference<Throwable>();
-        ChannelInboundHandlerAdapter handler = new ChannelDuplexHandler() {
+        ChannelHandler handler = new ChannelHandler() {
             @Override
             public void channelActive(ChannelHandlerContext ctx) throws Exception {
                 ctx.fireChannelActive();
@@ -430,7 +428,7 @@ public class FlowControlHandlerTest {
         final EmbeddedChannel channel = new EmbeddedChannel(false, false,
             new FlowControlHandler(),
             new IdleStateHandler(delayMillis, 0, 0, MILLISECONDS),
-            new ChannelInboundHandlerAdapter() {
+            new ChannelHandler() {
                 @Override
                 public void channelActive(ChannelHandlerContext ctx) {
                     ctx.fireChannelActive();
@@ -483,17 +481,17 @@ public class FlowControlHandlerTest {
     public void testRemoveFlowControl() throws Exception {
         final CountDownLatch latch = new CountDownLatch(3);
 
-        ChannelInboundHandlerAdapter handler = new ChannelDuplexHandler() {
+        ChannelHandler handler = new ChannelHandler() {
             @Override
-            public void channelActive(ChannelHandlerContext ctx) throws Exception {
+            public void channelActive(ChannelHandlerContext ctx) {
                 //do the first read
                 ctx.read();
-                super.channelActive(ctx);
+                ctx.fireChannelActive();
             }
             @Override
-            public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
+            public void channelRead(ChannelHandlerContext ctx, Object msg) {
                 latch.countDown();
-                super.channelRead(ctx, msg);
+                ctx.fireChannelRead(msg);
             }
         };
 
@@ -515,7 +513,7 @@ public class FlowControlHandlerTest {
                 }
             }
         };
-        ChannelInboundHandlerAdapter tail = new ChannelInboundHandlerAdapter() {
+        ChannelHandler tail = new ChannelHandler() {
             @Override
             public void channelRead(ChannelHandlerContext ctx, Object msg) {
                 //consume this msg
@@ -544,11 +542,11 @@ public class FlowControlHandlerTest {
      */
     private static final class OneByteToThreeStringsDecoder extends ByteToMessageDecoder {
         @Override
-        protected void decode(ChannelHandlerContext ctx, ByteBuf in, List<Object> out) {
+        protected void decode(ChannelHandlerContext ctx, ByteBuf in) {
             for (int i = 0; i < in.readableBytes(); i++) {
-                out.add("1");
-                out.add("2");
-                out.add("3");
+                ctx.fireChannelRead("1");
+                ctx.fireChannelRead("2");
+                ctx.fireChannelRead("3");
             }
             in.readerIndex(in.readableBytes());
         }

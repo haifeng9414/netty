@@ -18,15 +18,14 @@ package io.netty.handler.codec.compression;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.ByteToMessageDecoder;
-import io.netty.util.internal.ObjectUtil;
 import net.jpountz.lz4.LZ4Exception;
 import net.jpountz.lz4.LZ4Factory;
 import net.jpountz.lz4.LZ4FastDecompressor;
 
-import java.util.List;
 import java.util.zip.Checksum;
 
 import static io.netty.handler.codec.compression.Lz4Constants.*;
+import static java.util.Objects.requireNonNull;
 
 /**
  * Uncompresses a {@link ByteBuf} encoded with the LZ4 format.
@@ -137,12 +136,13 @@ public class Lz4FrameDecoder extends ByteToMessageDecoder {
      *                  You may set {@code null} if you do not want to validate checksum of each block
      */
     public Lz4FrameDecoder(LZ4Factory factory, Checksum checksum) {
-        decompressor = ObjectUtil.checkNotNull(factory, "factory").fastDecompressor();
+        requireNonNull(factory, "factory");
+        decompressor = factory.fastDecompressor();
         this.checksum = checksum == null ? null : ByteBufChecksum.wrapChecksum(checksum);
     }
 
     @Override
-    protected void decode(ChannelHandlerContext ctx, ByteBuf in, List<Object> out) throws Exception {
+    protected void decode(ChannelHandlerContext ctx, ByteBuf in) throws Exception {
         try {
             switch (currentState) {
             case INIT_BLOCK:
@@ -237,7 +237,7 @@ public class Lz4FrameDecoder extends ByteToMessageDecoder {
                     if (checksum != null) {
                         CompressionUtil.checkChecksum(checksum, uncompressed, currentChecksum);
                     }
-                    out.add(uncompressed);
+                    ctx.fireChannelRead(uncompressed);
                     uncompressed = null;
                     currentState = State.INIT_BLOCK;
                 } catch (LZ4Exception e) {

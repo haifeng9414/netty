@@ -23,6 +23,12 @@ import java.util.Random;
 
 import static io.netty.util.AsciiString.contains;
 import static io.netty.util.AsciiString.containsIgnoreCase;
+import static io.netty.util.CharsetUtil.ISO_8859_1;
+import static io.netty.util.CharsetUtil.US_ASCII;
+import static io.netty.util.CharsetUtil.UTF_16;
+import static io.netty.util.CharsetUtil.UTF_16BE;
+import static io.netty.util.CharsetUtil.UTF_16LE;
+import static io.netty.util.CharsetUtil.UTF_8;
 import static org.hamcrest.CoreMatchers.is;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
@@ -36,6 +42,18 @@ import static org.junit.Assert.assertTrue;
  */
 public class AsciiStringCharacterTest {
     private static final Random r = new Random();
+
+    private static final Charset[] CHARSETS = new Charset[]
+            { UTF_16, UTF_16BE, UTF_16LE, UTF_8, ISO_8859_1, US_ASCII };
+
+    @Test
+    public void testContentEqualsIgnoreCase() {
+        byte[] bytes = { 32, 'a' };
+        AsciiString asciiString = new AsciiString(bytes, 1, 1, false);
+        // https://github.com/netty/netty/issues/9475
+        assertFalse(asciiString.contentEqualsIgnoreCase("b"));
+        assertFalse(asciiString.contentEqualsIgnoreCase(AsciiString.of("b")));
+    }
 
     @Test
     public void testContentEqualsIgnoreCase() {
@@ -53,9 +71,7 @@ public class AsciiStringCharacterTest {
             b.append("eéaà");
         }
         final String bString = b.toString();
-        final Charset[] charsets = CharsetUtil.values();
-        for (int i = 0; i < charsets.length; ++i) {
-            final Charset charset = charsets[i];
+        for (final Charset charset : CHARSETS) {
             byte[] expected = bString.getBytes(charset);
             byte[] actual = new AsciiString(b, charset).toByteArray();
             assertArrayEquals("failure for " + charset, expected, actual);
@@ -69,9 +85,7 @@ public class AsciiStringCharacterTest {
             b.append("eéaà");
         }
         final String bString = b.toString();
-        final Charset[] charsets = CharsetUtil.values();
-        for (int i = 0; i < charsets.length; ++i) {
-            final Charset charset = charsets[i];
+        for (final Charset charset : CHARSETS) {
             byte[] expected = bString.getBytes(charset);
             byte[] actual = new AsciiString(bString, charset).toByteArray();
             assertArrayEquals("failure for " + charset, expected, actual);
@@ -86,7 +100,7 @@ public class AsciiStringCharacterTest {
         }
         final String bString = b.toString();
         // The AsciiString class actually limits the Charset to ISO_8859_1
-        byte[] expected = bString.getBytes(CharsetUtil.ISO_8859_1);
+        byte[] expected = bString.getBytes(ISO_8859_1);
         byte[] actual = new AsciiString(bString).toByteArray();
         assertArrayEquals(expected, actual);
     }
@@ -224,7 +238,7 @@ public class AsciiStringCharacterTest {
 
     @Test
     public void caseInsensitiveHasherCharBuffer() {
-        String s1 = new String("TRANSFER-ENCODING");
+        String s1 = "TRANSFER-ENCODING";
         char[] array = new char[128];
         final int offset = 100;
         for (int i = 0; i < s1.length(); ++i) {

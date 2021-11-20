@@ -50,6 +50,8 @@ import static io.netty.handler.codec.compression.Lz4Constants.MAX_BLOCK_SIZE;
 import static io.netty.handler.codec.compression.Lz4Constants.MIN_BLOCK_SIZE;
 import static io.netty.handler.codec.compression.Lz4Constants.TOKEN_OFFSET;
 
+import static java.util.Objects.requireNonNull;
+
 /**
  * Compresses a {@link ByteBuf} using the LZ4 format.
  *
@@ -158,8 +160,8 @@ public class Lz4FrameEncoder extends MessageToByteEncoder<ByteBuf> {
          */
     public Lz4FrameEncoder(LZ4Factory factory, boolean highCompressor, int blockSize,
                            Checksum checksum, int maxEncodeSize) {
-        ObjectUtil.checkNotNull(factory, "factory");
-        ObjectUtil.checkNotNull(checksum, "checksum");
+        requireNonNull(factory, "factory");
+        requireNonNull(checksum, "checksum");
 
         compressor = highCompressor ? factory.highCompressor() : factory.fastCompressor();
         this.checksum = ByteBufChecksum.wrapChecksum(checksum);
@@ -354,12 +356,9 @@ public class Lz4FrameEncoder extends MessageToByteEncoder<ByteBuf> {
         if (executor.inEventLoop()) {
             return finishEncode(ctx, promise);
         } else {
-            executor.execute(new Runnable() {
-                @Override
-                public void run() {
-                    ChannelFuture f = finishEncode(ctx(), promise);
-                    f.addListener(new ChannelPromiseNotifier(promise));
-                }
+            executor.execute(() -> {
+                ChannelFuture f = finishEncode(ctx(), promise);
+                f.addListener(new ChannelPromiseNotifier(promise));
             });
             return promise;
         }
@@ -368,20 +367,12 @@ public class Lz4FrameEncoder extends MessageToByteEncoder<ByteBuf> {
     @Override
     public void close(final ChannelHandlerContext ctx, final ChannelPromise promise) throws Exception {
         ChannelFuture f = finishEncode(ctx, ctx.newPromise());
-        f.addListener(new ChannelFutureListener() {
-            @Override
-            public void operationComplete(ChannelFuture f) throws Exception {
-                ctx.close(promise);
-            }
-        });
+        f.addListener((ChannelFutureListener) f1 -> ctx.close(promise));
 
         if (!f.isDone()) {
             // Ensure the channel is closed even if the write operation completes in time.
-            ctx.executor().schedule(new Runnable() {
-                @Override
-                public void run() {
-                    ctx.close(promise);
-                }
+            ctx.executor().schedule(() -> {
+                ctx.close(promise);
             }, 10, TimeUnit.SECONDS); // FIXME: Magic number
         }
     }

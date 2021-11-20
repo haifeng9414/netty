@@ -16,10 +16,10 @@
 package io.netty.handler.codec.http;
 
 import static io.netty.util.internal.ObjectUtil.checkPositiveOrZero;
+import static java.util.Objects.requireNonNull;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.util.CharsetUtil;
-import io.netty.util.internal.ObjectUtil;
 
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -56,7 +56,7 @@ public class HttpVersion implements Comparable<HttpVersion> {
      * returned.
      */
     public static HttpVersion valueOf(String text) {
-        ObjectUtil.checkNotNull(text, "text");
+        requireNonNull(text, "text");
 
         text = text.trim();
 
@@ -108,7 +108,7 @@ public class HttpVersion implements Comparable<HttpVersion> {
      *        the {@code "Connection"} header is set to {@code "close"} explicitly.
      */
     public HttpVersion(String text, boolean keepAliveDefault) {
-        ObjectUtil.checkNotNull(text, "text");
+        requireNonNull(text, "text");
 
         text = text.trim().toUpperCase();
         if (text.isEmpty()) {
@@ -148,7 +148,7 @@ public class HttpVersion implements Comparable<HttpVersion> {
     private HttpVersion(
             String protocolName, int majorVersion, int minorVersion,
             boolean keepAliveDefault, boolean bytes) {
-        ObjectUtil.checkNotNull(protocolName, "protocolName");
+        requireNonNull(protocolName, "protocolName");
 
         protocolName = protocolName.trim().toUpperCase();
         if (protocolName.isEmpty()) {

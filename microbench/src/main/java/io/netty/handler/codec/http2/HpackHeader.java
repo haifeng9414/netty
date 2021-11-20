@@ -57,7 +57,7 @@ final class HpackHeader {
      */
     static List<HpackHeader> createHeaders(int numHeaders, int nameLength, int valueLength,
                                            boolean limitToAscii) {
-        List<HpackHeader> hpackHeaders = new ArrayList<HpackHeader>(numHeaders);
+        List<HpackHeader> hpackHeaders = new ArrayList<>(numHeaders);
         for (int i = 0; i < numHeaders; ++i) {
             // Force always ascii for header names
             byte[] name = randomBytes(new byte[nameLength], true);

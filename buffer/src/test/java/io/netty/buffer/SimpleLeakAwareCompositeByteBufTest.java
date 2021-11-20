@@ -15,7 +15,6 @@
  */
 package io.netty.buffer;
 
-import io.netty.util.ByteProcessor;
 import io.netty.util.ResourceLeakTracker;
 import org.hamcrest.CoreMatchers;
 import org.junit.After;
@@ -33,11 +32,11 @@ import static org.junit.Assert.assertTrue;
 public class SimpleLeakAwareCompositeByteBufTest extends WrappedCompositeByteBufTest {
 
     private final Class<? extends ByteBuf> clazz = leakClass();
-    private final Queue<NoopResourceLeakTracker<ByteBuf>> trackers = new ArrayDeque<NoopResourceLeakTracker<ByteBuf>>();
+    private final Queue<NoopResourceLeakTracker<ByteBuf>> trackers = new ArrayDeque<>();
 
     @Override
     protected final WrappedCompositeByteBuf wrap(CompositeByteBuf buffer) {
-        NoopResourceLeakTracker<ByteBuf> tracker = new NoopResourceLeakTracker<ByteBuf>();
+        NoopResourceLeakTracker<ByteBuf> tracker = new NoopResourceLeakTracker<>();
         WrappedCompositeByteBuf leakAwareBuf = wrap(buffer, tracker);
         trackers.add(tracker);
         return leakAwareBuf;
@@ -146,12 +145,7 @@ public class SimpleLeakAwareCompositeByteBufTest extends WrappedCompositeByteBuf
         comp.addComponent(true, inner);
         buf.addComponent(true, comp);
 
-        assertEquals(-1, buf.forEachByte(new ByteProcessor() {
-            @Override
-            public boolean process(byte value) {
-                return true;
-            }
-        }));
+        assertEquals(-1, buf.forEachByte(value -> true));
         assertTrue(buf.release());
     }
 

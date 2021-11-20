@@ -25,6 +25,7 @@ import io.netty.channel.ChannelOutboundBuffer;
 import io.netty.channel.ChannelPipeline;
 import io.netty.channel.ChannelPromise;
 import io.netty.channel.DefaultAddressedEnvelope;
+import io.netty.channel.EventLoop;
 import io.netty.channel.socket.DatagramChannel;
 import io.netty.channel.socket.DatagramChannelConfig;
 import io.netty.channel.socket.DatagramPacket;
@@ -36,7 +37,6 @@ import io.netty.channel.unix.IovArray;
 import io.netty.channel.unix.Socket;
 import io.netty.channel.unix.UnixChannelUtil;
 import io.netty.util.ReferenceCountUtil;
-import io.netty.util.internal.ObjectUtil;
 import io.netty.util.internal.RecyclableArrayList;
 import io.netty.util.internal.StringUtil;
 
@@ -50,6 +50,7 @@ import java.net.SocketAddress;
 import java.nio.ByteBuffer;
 
 import static io.netty.channel.epoll.LinuxSocket.newSocketDgram;
+import static java.util.Objects.requireNonNull;
 
 /**
  * {@link DatagramChannel} implementation that uses linux EPOLL Edge-Triggered Mode for
@@ -71,30 +72,31 @@ public final class EpollDatagramChannel extends AbstractEpollChannel implements 
      * Create a new instance which selects the {@link InternetProtocolFamily} to use depending
      * on the Operation Systems default which will be chosen.
      */
-    public EpollDatagramChannel() {
-        this(null);
+    public EpollDatagramChannel(EventLoop eventLoop) {
+        this(eventLoop, null);
     }
 
     /**
      * Create a new instance using the given {@link InternetProtocolFamily}. If {@code null} is used it will depend
      * on the Operation Systems default which will be chosen.
      */
-    public EpollDatagramChannel(InternetProtocolFamily family) {
-        this(family == null ?
-                newSocketDgram(Socket.isIPv6Preferred()) : newSocketDgram(family == InternetProtocolFamily.IPv6),
-                false);
+    public EpollDatagramChannel(EventLoop eventLoop, InternetProtocolFamily family) {
+        this(eventLoop, family == null ?
+            newSocketDgram(Socket.isIPv6Preferred()) :
+            newSocketDgram(family == InternetProtocolFamily.IPv6),
+        false);
     }
 
     /**
      * Create a new instance which selects the {@link InternetProtocolFamily} to use depending
      * on the Operation Systems default which will be chosen.
      */
-    public EpollDatagramChannel(int fd) {
-        this(new LinuxSocket(fd), true);
+    public EpollDatagramChannel(EventLoop eventLoop, int fd) {
+        this(eventLoop, new LinuxSocket(fd), true);
     }
 
-    private EpollDatagramChannel(LinuxSocket fd, boolean active) {
-        super(null, fd, active);
+    private EpollDatagramChannel(EventLoop eventLoop, LinuxSocket fd, boolean active) {
+        super(null, eventLoop, fd, active);
         config = new EpollDatagramChannelConfig(this);
     }
 
@@ -164,9 +166,8 @@ public final class EpollDatagramChannel extends AbstractEpollChannel implements 
     public ChannelFuture joinGroup(
             final InetAddress multicastAddress, final NetworkInterface networkInterface,
             final InetAddress source, final ChannelPromise promise) {
-
-        ObjectUtil.checkNotNull(multicastAddress, "multicastAddress");
-        ObjectUtil.checkNotNull(networkInterface, "networkInterface");
+        requireNonNull(multicastAddress, "multicastAddress");
+        requireNonNull(networkInterface, "networkInterface");
 
         try {
             socket.joinGroup(multicastAddress, networkInterface, source);
@@ -216,8 +217,8 @@ public final class EpollDatagramChannel extends AbstractEpollChannel implements 
     public ChannelFuture leaveGroup(
             final InetAddress multicastAddress, final NetworkInterface networkInterface, final InetAddress source,
             final ChannelPromise promise) {
-        ObjectUtil.checkNotNull(multicastAddress, "multicastAddress");
-        ObjectUtil.checkNotNull(networkInterface, "networkInterface");
+        requireNonNull(multicastAddress, "multicastAddress");
+        requireNonNull(networkInterface, "networkInterface");
 
         try {
             socket.leaveGroup(multicastAddress, networkInterface, source);
@@ -239,10 +240,9 @@ public final class EpollDatagramChannel extends AbstractEpollChannel implements 
     public ChannelFuture block(
             final InetAddress multicastAddress, final NetworkInterface networkInterface,
             final InetAddress sourceToBlock, final ChannelPromise promise) {
-        ObjectUtil.checkNotNull(multicastAddress, "multicastAddress");
-        ObjectUtil.checkNotNull(sourceToBlock, "sourceToBlock");
-        ObjectUtil.checkNotNull(networkInterface, "networkInterface");
-
+        requireNonNull(multicastAddress, "multicastAddress");
+        requireNonNull(sourceToBlock, "sourceToBlock");
+        requireNonNull(networkInterface, "networkInterface");
         promise.setFailure(new UnsupportedOperationException("Multicast not supported"));
         return promise;
     }
@@ -377,7 +377,7 @@ public final class EpollDatagramChannel extends AbstractEpollChannel implements 
                         remoteAddress.getAddress(), remoteAddress.getPort());
             }
         } else if (data.nioBufferCount() > 1) {
-            IovArray array = ((EpollEventLoop) eventLoop()).cleanIovArray();
+            IovArray array = registration().cleanIovArray();
             array.add(data, data.readerIndex(), data.readableBytes());
             int cnt = array.count();
             assert cnt != 0;
@@ -423,8 +423,8 @@ public final class EpollDatagramChannel extends AbstractEpollChannel implements 
 
                 ByteBuf content = (ByteBuf) e.content();
                 return UnixChannelUtil.isBufferCopyNeededForWrite(content)?
-                        new DefaultAddressedEnvelope<ByteBuf, InetSocketAddress>(
-                            newDirectBuffer(e, content), (InetSocketAddress) e.recipient()) : e;
+                        new DefaultAddressedEnvelope<>(
+                                newDirectBuffer(e, content), (InetSocketAddress) e.recipient()) : e;
             }
         }
 
@@ -470,7 +470,6 @@ public final class EpollDatagramChannel extends AbstractEpollChannel implements 
                 return;
             }
             final EpollRecvByteAllocatorHandle allocHandle = recvBufAllocHandle();
-            allocHandle.edgeTriggered(isFlagSet(Native.EPOLLET));
 
             final ChannelPipeline pipeline = pipeline();
             final ByteBufAllocator allocator = config.getAllocator();
@@ -525,6 +524,7 @@ public final class EpollDatagramChannel extends AbstractEpollChannel implements 
                 if (exception != null) {
                     pipeline.fireExceptionCaught(exception);
                 }
+                readIfIsAutoRead();
             } finally {
                 epollInFinally(config);
             }
@@ -689,6 +689,6 @@ public final class EpollDatagramChannel extends AbstractEpollChannel implements 
     }
 
     private NativeDatagramPacketArray cleanDatagramPacketArray() {
-        return ((EpollEventLoop) eventLoop()).cleanDatagramPacketArray();
+        return registration().cleanDatagramPacketArray();
     }
 }

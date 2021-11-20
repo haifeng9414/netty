@@ -16,6 +16,7 @@
 
 package io.netty.handler.ssl;
 
+import static java.util.Objects.requireNonNull;
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.CoreMatchers.nullValue;
 import static org.junit.Assert.assertEquals;
@@ -51,17 +52,18 @@ import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
+import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
-import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelPipeline;
-import io.netty.channel.DefaultEventLoopGroup;
+import io.netty.channel.MultithreadEventLoopGroup;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.embedded.EmbeddedChannel;
 import io.netty.channel.local.LocalAddress;
 import io.netty.channel.local.LocalChannel;
+import io.netty.channel.local.LocalHandler;
 import io.netty.channel.local.LocalServerChannel;
-import io.netty.channel.nio.NioEventLoopGroup;
+import io.netty.channel.nio.NioHandler;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.handler.codec.DecoderException;
@@ -73,7 +75,7 @@ import io.netty.util.Mapping;
 import io.netty.util.ReferenceCountUtil;
 import io.netty.util.ReferenceCounted;
 import io.netty.util.concurrent.Promise;
-import io.netty.util.internal.ObjectUtil;
+
 import io.netty.util.internal.ResourcesUtil;
 import io.netty.util.internal.StringUtil;
 import org.mockito.Mockito;
@@ -137,7 +139,7 @@ public class SniHandlerTest {
 
     @Parameterized.Parameters(name = "{index}: sslProvider={0}")
     public static Iterable<?> data() {
-        List<SslProvider> params = new ArrayList<SslProvider>(3);
+        List<SslProvider> params = new ArrayList<>(3);
         if (OpenSsl.isAvailable()) {
             params.add(SslProvider.OPENSSL);
             params.add(SslProvider.OPENSSL_REFCNT);
@@ -157,9 +159,9 @@ public class SniHandlerTest {
         SslContext nettyContext = makeSslContext(provider, false);
         try {
             final AtomicReference<SslHandshakeCompletionEvent> evtRef =
-                    new AtomicReference<SslHandshakeCompletionEvent>();
-            SniHandler handler = new SniHandler(new DomainNameMappingBuilder<SslContext>(nettyContext).build());
-            EmbeddedChannel ch = new EmbeddedChannel(handler, new ChannelInboundHandlerAdapter() {
+                    new AtomicReference<>();
+            SniHandler handler = new SniHandler(new DomainNameMappingBuilder<>(nettyContext).build());
+            EmbeddedChannel ch = new EmbeddedChannel(handler, new ChannelHandler() {
                 @Override
                 public void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws Exception {
                     if (evt instanceof SslHandshakeCompletionEvent) {
@@ -195,7 +197,7 @@ public class SniHandlerTest {
         SslContext leanContext2 = makeSslContext(provider, false);
 
         try {
-            DomainNameMapping<SslContext> mapping = new DomainNameMappingBuilder<SslContext>(nettyContext)
+            DomainNameMapping<SslContext> mapping = new DomainNameMappingBuilder<>(nettyContext)
                     .add("*.netty.io", nettyContext)
                     // input with custom cases
                     .add("*.LEANCLOUD.CN", leanContext)
@@ -204,9 +206,9 @@ public class SniHandlerTest {
                     .add("chat4.leancloud.cn", leanContext2)
                     .build();
 
-            final AtomicReference<SniCompletionEvent> evtRef = new AtomicReference<SniCompletionEvent>();
+            final AtomicReference<SniCompletionEvent> evtRef = new AtomicReference<>();
             SniHandler handler = new SniHandler(mapping);
-            EmbeddedChannel ch = new EmbeddedChannel(handler, new ChannelInboundHandlerAdapter() {
+            EmbeddedChannel ch = new EmbeddedChannel(handler, new ChannelHandler() {
                 @Override
                 public void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws Exception {
                     if (evt instanceof SniCompletionEvent) {
@@ -258,7 +260,7 @@ public class SniHandlerTest {
         SslContext leanContext2 = makeSslContext(provider, false);
 
         try {
-            DomainNameMapping<SslContext> mapping = new DomainNameMappingBuilder<SslContext>(nettyContext)
+            DomainNameMapping<SslContext> mapping = new DomainNameMappingBuilder<>(nettyContext)
                     .add("*.netty.io", nettyContext)
                     // input with custom cases
                     .add("*.LEANCLOUD.CN", leanContext)
@@ -301,7 +303,7 @@ public class SniHandlerTest {
         SslContext leanContext2 = makeSslContext(provider, false);
 
         try {
-            DomainNameMapping<SslContext> mapping = new DomainNameMappingBuilder<SslContext>(nettyContext)
+            DomainNameMapping<SslContext> mapping = new DomainNameMappingBuilder<>(nettyContext)
                     .add("*.netty.io", nettyContext)
                     // input with custom cases
                     .add("*.LEANCLOUD.CN", leanContext)
@@ -396,11 +398,11 @@ public class SniHandlerTest {
             final CountDownLatch serverApnDoneLatch = new CountDownLatch(1);
             final CountDownLatch clientApnDoneLatch = new CountDownLatch(1);
 
-            final DomainNameMapping<SslContext> mapping = new DomainNameMappingBuilder<SslContext>(nettyContext)
+            final DomainNameMapping<SslContext> mapping = new DomainNameMappingBuilder<>(nettyContext)
                     .add("*.netty.io", nettyContext)
                     .add("sni.fake.site", sniContext).build();
             final SniHandler handler = new SniHandler(mapping);
-            EventLoopGroup group = new NioEventLoopGroup(2);
+            EventLoopGroup group = new MultithreadEventLoopGroup(2, NioHandler.newFactory());
             Channel serverChannel = null;
             Channel clientChannel = null;
             try {
@@ -478,7 +480,7 @@ public class SniHandlerTest {
             case OPENSSL_REFCNT:
                 final String sniHost = "sni.netty.io";
                 LocalAddress address = new LocalAddress("testReplaceHandler-" + Math.random());
-                EventLoopGroup group = new DefaultEventLoopGroup(1);
+                EventLoopGroup group = new MultithreadEventLoopGroup(1, LocalHandler.newFactory());
                 Channel sc = null;
                 Channel cc = null;
                 SslContext sslContext = null;
@@ -491,12 +493,7 @@ public class SniHandlerTest {
                             .sslProvider(provider)
                             .build();
 
-                    final Mapping<String, SslContext> mapping = new Mapping<String, SslContext>() {
-                        @Override
-                        public SslContext map(String input) {
-                            return sslServerContext;
-                        }
-                    };
+                    final Mapping<String, SslContext> mapping = input -> sslServerContext;
 
                     final Promise<Void> releasePromise = group.next().newPromise();
 
@@ -607,7 +604,7 @@ public class SniHandlerTest {
 
         CustomSslHandler(SslContext sslContext, SSLEngine sslEngine) {
             super(sslEngine);
-            this.sslContext = ObjectUtil.checkNotNull(sslContext, "sslContext");
+            this.sslContext = requireNonNull(sslContext, "sslContext");
         }
 
         @Override

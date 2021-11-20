@@ -27,8 +27,9 @@ import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.EventLoopGroup;
+import io.netty.channel.MultithreadEventLoopGroup;
 import io.netty.channel.embedded.EmbeddedChannel;
-import io.netty.channel.nio.NioEventLoopGroup;
+import io.netty.channel.nio.NioHandler;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.handler.codec.EncoderException;
@@ -240,11 +241,11 @@ public class Lz4FrameEncoderTest extends AbstractEncoderTest {
 
     @Test(timeout = 3000)
     public void writingAfterClosedChannelDoesNotNPE() throws InterruptedException {
-        EventLoopGroup group = new NioEventLoopGroup(2);
+        EventLoopGroup group = new MultithreadEventLoopGroup(2, NioHandler.newFactory());
         Channel serverChannel = null;
         Channel clientChannel = null;
         final CountDownLatch latch = new CountDownLatch(1);
-        final AtomicReference<Throwable> writeFailCauseRef = new AtomicReference<Throwable>();
+        final AtomicReference<Throwable> writeFailCauseRef = new AtomicReference<>();
         try {
             ServerBootstrap sb = new ServerBootstrap();
             sb.group(group);
@@ -269,24 +270,18 @@ public class Lz4FrameEncoderTest extends AbstractEncoderTest {
             clientChannel = bs.connect(serverChannel.localAddress()).syncUninterruptibly().channel();
 
             final Channel finalClientChannel = clientChannel;
-            clientChannel.eventLoop().execute(new Runnable() {
-                @Override
-                public void run() {
-                    finalClientChannel.close();
-                    final int size = 27;
-                    ByteBuf buf = ByteBufAllocator.DEFAULT.buffer(size, size);
-                    finalClientChannel.writeAndFlush(buf.writerIndex(buf.writerIndex() + size))
-                            .addListener(new ChannelFutureListener() {
-                        @Override
-                        public void operationComplete(ChannelFuture future) throws Exception {
+            clientChannel.eventLoop().execute(() -> {
+                finalClientChannel.close();
+                final int size = 27;
+                ByteBuf buf = ByteBufAllocator.DEFAULT.buffer(size, size);
+                finalClientChannel.writeAndFlush(buf.writerIndex(buf.writerIndex() + size))
+                        .addListener((ChannelFutureListener) future -> {
                             try {
                                 writeFailCauseRef.set(future.cause());
                             } finally {
                                 latch.countDown();
                             }
-                        }
-                    });
-                }
+                        });
             });
             latch.await();
             Throwable writeFailCause = writeFailCauseRef.get();

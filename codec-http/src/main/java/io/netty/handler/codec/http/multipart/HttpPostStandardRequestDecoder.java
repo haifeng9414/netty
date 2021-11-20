@@ -38,7 +38,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 
-import static io.netty.util.internal.ObjectUtil.*;
+import static io.netty.util.internal.ObjectUtil.checkPositiveOrZero;
+import static java.util.Objects.requireNonNull;
+
 
 /**
  * This decoder will decode Body and can handle POST BODY.
@@ -71,12 +73,12 @@ public class HttpPostStandardRequestDecoder implements InterfaceHttpPostRequestD
     /**
      * HttpDatas from Body
      */
-    private final List<InterfaceHttpData> bodyListHttpData = new ArrayList<InterfaceHttpData>();
+    private final List<InterfaceHttpData> bodyListHttpData = new ArrayList<>();
 
     /**
      * HttpDatas as Map from Body
      */
-    private final Map<String, List<InterfaceHttpData>> bodyMapHttpData = new TreeMap<String, List<InterfaceHttpData>>(
+    private final Map<String, List<InterfaceHttpData>> bodyMapHttpData = new TreeMap<>(
             CaseIgnoringComparator.INSTANCE);
 
     /**
@@ -148,9 +150,9 @@ public class HttpPostStandardRequestDecoder implements InterfaceHttpPostRequestD
      *             errors
      */
     public HttpPostStandardRequestDecoder(HttpDataFactory factory, HttpRequest request, Charset charset) {
-        this.request = checkNotNull(request, "request");
-        this.charset = checkNotNull(charset, "charset");
-        this.factory = checkNotNull(factory, "factory");
+        this.request = requireNonNull(request, "request");
+        this.charset = requireNonNull(charset, "charset");
+        this.factory = requireNonNull(factory, "factory");
         try {
             if (request instanceof HttpContent) {
                 // Offer automatically if the given request is als type of HttpContent
@@ -384,7 +386,7 @@ public class HttpPostStandardRequestDecoder implements InterfaceHttpPostRequestD
         }
         List<InterfaceHttpData> datas = bodyMapHttpData.get(data.getName());
         if (datas == null) {
-            datas = new ArrayList<InterfaceHttpData>(1);
+            datas = new ArrayList<>(1);
             bodyMapHttpData.put(data.getName(), datas);
         }
         datas.add(data);
@@ -621,11 +623,7 @@ public class HttpPostStandardRequestDecoder implements InterfaceHttpPostRequestD
             // error while decoding
             undecodedChunk.readerIndex(firstpos);
             throw e;
-        } catch (IOException e) {
-            // error while decoding
-            undecodedChunk.readerIndex(firstpos);
-            throw new ErrorDataDecoderException(e);
-        } catch (IllegalArgumentException e) {
+        } catch (IOException | IllegalArgumentException e) {
             // error while decoding
             undecodedChunk.readerIndex(firstpos);
             throw new ErrorDataDecoderException(e);

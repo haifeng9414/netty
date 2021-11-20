@@ -21,12 +21,13 @@ import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
+import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
-import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.DefaultFileRegion;
 import io.netty.channel.EventLoopGroup;
-import io.netty.channel.nio.NioEventLoopGroup;
+import io.netty.channel.MultithreadEventLoopGroup;
+import io.netty.channel.nio.NioHandler;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
@@ -63,27 +64,17 @@ public class FileRegionThrottleTest {
 
         tmp = File.createTempFile("netty-traffic", ".tmp");
         tmp.deleteOnExit();
-        FileOutputStream out = null;
-        try {
-            out = new FileOutputStream(tmp);
+        try (FileOutputStream out = new FileOutputStream(tmp)) {
             out.write(BYTES);
             out.flush();
         } catch (IOException e) {
             throw new RuntimeException(e);
-        } finally {
-            if (out != null) {
-                try {
-                    out.close();
-                } catch (IOException e) {
-                    // ignore
-                }
-            }
         }
     }
 
     @Before
     public void setUp() {
-        group = new NioEventLoopGroup();
+        group = new MultithreadEventLoopGroup(NioHandler.newFactory());
     }
 
     @After
@@ -127,7 +118,7 @@ public class FileRegionThrottleTest {
         return bc.connect(server).sync();
     }
 
-    private static final class MessageDecoder extends ChannelInboundHandlerAdapter {
+    private static final class MessageDecoder implements ChannelHandler {
         @Override
         public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
             if (msg instanceof ByteBuf) {
@@ -142,7 +133,7 @@ public class FileRegionThrottleTest {
         }
     }
 
-    private static final class ReadHandler extends ChannelInboundHandlerAdapter {
+    private static final class ReadHandler implements ChannelHandler {
         private long bytesTransferred;
         private CountDownLatch latch;
 

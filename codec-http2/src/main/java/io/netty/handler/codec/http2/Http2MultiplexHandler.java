@@ -27,10 +27,10 @@ import io.netty.channel.EventLoop;
 import io.netty.channel.ServerChannel;
 import io.netty.handler.codec.http2.Http2FrameCodec.DefaultHttp2FrameStream;
 import io.netty.util.ReferenceCounted;
-import io.netty.util.internal.ObjectUtil;
 import io.netty.util.internal.UnstableApi;
 
 import java.util.ArrayDeque;
+import java.util.Objects;
 import java.util.Queue;
 
 import static io.netty.handler.codec.http2.Http2Error.INTERNAL_ERROR;
@@ -85,12 +85,7 @@ import static io.netty.handler.codec.http2.Http2Exception.connectionError;
 @UnstableApi
 public final class Http2MultiplexHandler extends Http2ChannelDuplexHandler {
 
-    static final ChannelFutureListener CHILD_CHANNEL_REGISTRATION_LISTENER = new ChannelFutureListener() {
-        @Override
-        public void operationComplete(ChannelFuture future) {
-            registerDone(future);
-        }
-    };
+    static final ChannelFutureListener CHILD_CHANNEL_REGISTRATION_LISTENER = Http2MultiplexHandler::registerDone;
 
     private final ChannelHandler inboundStreamHandler;
     private final ChannelHandler upgradeStreamHandler;
@@ -124,7 +119,7 @@ public final class Http2MultiplexHandler extends Http2ChannelDuplexHandler {
      *                             upgraded {@link Channel}.
      */
     public Http2MultiplexHandler(ChannelHandler inboundStreamHandler, ChannelHandler upgradeStreamHandler) {
-        this.inboundStreamHandler = ObjectUtil.checkNotNull(inboundStreamHandler, "inboundStreamHandler");
+        this.inboundStreamHandler = Objects.requireNonNull(inboundStreamHandler, "inboundStreamHandler");
         this.upgradeStreamHandler = upgradeStreamHandler;
     }
 
@@ -235,7 +230,7 @@ public final class Http2MultiplexHandler extends Http2ChannelDuplexHandler {
                         } else {
                             ch = new Http2MultiplexHandlerStreamChannel(stream, inboundStreamHandler);
                         }
-                        ChannelFuture future = ctx.channel().eventLoop().register(ch);
+                        ChannelFuture future = ch.register();
                         if (future.isDone()) {
                             registerDone(future);
                         } else {
@@ -287,17 +282,14 @@ public final class Http2MultiplexHandler extends Http2ChannelDuplexHandler {
     private void onHttp2GoAwayFrame(ChannelHandlerContext ctx, final Http2GoAwayFrame goAwayFrame) {
         try {
             final boolean server = isServer(ctx);
-            forEachActiveStream(new Http2FrameStreamVisitor() {
-                @Override
-                public boolean visit(Http2FrameStream stream) {
-                    final int streamId = stream.id();
-                    if (streamId > goAwayFrame.lastStreamId() && Http2CodecUtil.isStreamIdValid(streamId, server)) {
-                        final AbstractHttp2StreamChannel childChannel = (AbstractHttp2StreamChannel)
-                                ((DefaultHttp2FrameStream) stream).attachment;
-                        childChannel.pipeline().fireUserEventTriggered(goAwayFrame.retainedDuplicate());
-                    }
-                    return true;
+            forEachActiveStream(stream -> {
+                final int streamId = stream.id();
+                if (streamId > goAwayFrame.lastStreamId() && Http2CodecUtil.isStreamIdValid(streamId, server)) {
+                    final AbstractHttp2StreamChannel childChannel = (AbstractHttp2StreamChannel)
+                            ((DefaultHttp2FrameStream) stream).attachment;
+                    childChannel.pipeline().fireUserEventTriggered(goAwayFrame.retainedDuplicate());
                 }
+                return true;
             });
         } catch (Http2Exception e) {
             ctx.fireExceptionCaught(e);

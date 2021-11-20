@@ -82,7 +82,8 @@ public final class TcpDnsClient {
                                     .addLast(new TcpDnsResponseDecoder())
                                     .addLast(new SimpleChannelInboundHandler<DefaultDnsResponse>() {
                                         @Override
-                                        protected void channelRead0(ChannelHandlerContext ctx, DefaultDnsResponse msg) {
+                                        protected void messageReceived(
+                                                ChannelHandlerContext ctx, DefaultDnsResponse msg) {
                                             try {
                                                 handleQueryResp(msg);
                                             } finally {

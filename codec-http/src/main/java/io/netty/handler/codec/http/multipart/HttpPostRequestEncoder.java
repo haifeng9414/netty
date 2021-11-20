@@ -34,8 +34,6 @@ import io.netty.handler.codec.http.HttpUtil;
 import io.netty.handler.codec.http.HttpVersion;
 import io.netty.handler.codec.http.LastHttpContent;
 import io.netty.handler.stream.ChunkedInput;
-import io.netty.util.internal.ObjectUtil;
-import io.netty.util.internal.PlatformDependent;
 import io.netty.util.internal.StringUtil;
 
 import java.io.File;
@@ -47,11 +45,12 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.ListIterator;
 import java.util.Map;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.regex.Pattern;
 
 import static io.netty.buffer.Unpooled.wrappedBuffer;
-import static io.netty.util.internal.ObjectUtil.checkNotNull;
 import static java.util.AbstractMap.SimpleImmutableEntry;
+import static java.util.Objects.requireNonNull;
 
 /**
  * This encoder will help to encode Request for a FORM as POST.
@@ -99,9 +98,9 @@ public class HttpPostRequestEncoder implements ChunkedInput<HttpContent> {
 
     static {
         percentEncodings = new Map.Entry[] {
-                new SimpleImmutableEntry<Pattern, String>(Pattern.compile("\\*"), "%2A"),
-                new SimpleImmutableEntry<Pattern, String>(Pattern.compile("\\+"), "%20"),
-                new SimpleImmutableEntry<Pattern, String>(Pattern.compile("~"), "%7E")
+                new SimpleImmutableEntry<>(Pattern.compile("\\*"), "%2A"),
+                new SimpleImmutableEntry<>(Pattern.compile("\\+"), "%20"),
+                new SimpleImmutableEntry<>(Pattern.compile("~"), "%7E")
         };
     }
 
@@ -210,19 +209,19 @@ public class HttpPostRequestEncoder implements ChunkedInput<HttpContent> {
             HttpDataFactory factory, HttpRequest request, boolean multipart, Charset charset,
             EncoderMode encoderMode)
             throws ErrorDataEncoderException {
-        this.request = checkNotNull(request, "request");
-        this.charset = checkNotNull(charset, "charset");
-        this.factory = checkNotNull(factory, "factory");
+        this.request = requireNonNull(request, "request");
+        this.charset = requireNonNull(charset, "charset");
+        this.factory = requireNonNull(factory, "factory");
         if (HttpMethod.TRACE.equals(request.method())) {
             throw new ErrorDataEncoderException("Cannot create a Encoder if request is a TRACE");
         }
         // Fill default values
-        bodyListDatas = new ArrayList<InterfaceHttpData>();
+        bodyListDatas = new ArrayList<>();
         // default mode
         isLastChunk = false;
         isLastChunkSent = false;
         isMultipart = multipart;
-        multipartHttpDatas = new ArrayList<InterfaceHttpData>();
+        multipartHttpDatas = new ArrayList<>();
         this.encoderMode = encoderMode;
         if (isMultipart) {
             initDataMultipart();
@@ -290,7 +289,7 @@ public class HttpPostRequestEncoder implements ChunkedInput<HttpContent> {
      */
     private static String getNewMultipartDelimiter() {
         // construct a generated delimiter
-        return Long.toHexString(PlatformDependent.threadLocalRandom().nextLong());
+        return Long.toHexString(ThreadLocalRandom.current().nextLong());
     }
 
     /**
@@ -311,7 +310,7 @@ public class HttpPostRequestEncoder implements ChunkedInput<HttpContent> {
      *             if the encoding is in error or if the finalize were already done
      */
     public void setBodyHttpDatas(List<InterfaceHttpData> datas) throws ErrorDataEncoderException {
-        ObjectUtil.checkNotNull(datas, "datas");
+        requireNonNull(datas, "datas");
         globalBodySize = 0;
         bodyListDatas.clear();
         currentFileUpload = null;
@@ -336,7 +335,7 @@ public class HttpPostRequestEncoder implements ChunkedInput<HttpContent> {
      */
     public void addBodyAttribute(String name, String value) throws ErrorDataEncoderException {
         String svalue = value != null? value : StringUtil.EMPTY_STRING;
-        Attribute data = factory.createAttribute(request, checkNotNull(name, "name"), svalue);
+        Attribute data = factory.createAttribute(request, requireNonNull(name, "name"), svalue);
         addBodyHttpData(data);
     }
 
@@ -382,8 +381,8 @@ public class HttpPostRequestEncoder implements ChunkedInput<HttpContent> {
      */
     public void addBodyFileUpload(String name, String filename, File file, String contentType, boolean isText)
             throws ErrorDataEncoderException {
-        checkNotNull(name, "name");
-        checkNotNull(file, "file");
+        requireNonNull(name, "name");
+        requireNonNull(file, "file");
         if (filename == null) {
             filename = StringUtil.EMPTY_STRING;
         }
@@ -447,7 +446,7 @@ public class HttpPostRequestEncoder implements ChunkedInput<HttpContent> {
         if (headerFinalized) {
             throw new ErrorDataEncoderException("Cannot add value once finalized");
         }
-        bodyListDatas.add(checkNotNull(data, "data"));
+        bodyListDatas.add(requireNonNull(data, "data"));
         if (!isMultipart) {
             if (data instanceof Attribute) {
                 Attribute attribute = (Attribute) data;

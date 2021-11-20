@@ -24,8 +24,6 @@ import io.netty.handler.codec.CorruptedFrameException;
 import io.netty.handler.codec.TooLongFrameException;
 import io.netty.channel.ChannelPipeline;
 
-import java.util.List;
-
 /**
  * Splits a byte stream of JSON objects and arrays into individual objects/arrays and passes them up the
  * {@link ChannelPipeline}.
@@ -88,7 +86,7 @@ public class JsonObjectDecoder extends ByteToMessageDecoder {
     }
 
     @Override
-    protected void decode(ChannelHandlerContext ctx, ByteBuf in, List<Object> out) throws Exception {
+    protected void decode(ChannelHandlerContext ctx, ByteBuf in) throws Exception {
         if (state == ST_CORRUPTED) {
             in.skipBytes(in.readableBytes());
             return;
@@ -120,7 +118,7 @@ public class JsonObjectDecoder extends ByteToMessageDecoder {
                 if (openBraces == 0) {
                     ByteBuf json = extractObject(ctx, in, in.readerIndex(), idx + 1 - in.readerIndex());
                     if (json != null) {
-                        out.add(json);
+                        ctx.fireChannelRead(json);
                     }
 
                     // The JSON object/array was extracted => discard the bytes from
@@ -148,7 +146,7 @@ public class JsonObjectDecoder extends ByteToMessageDecoder {
 
                     ByteBuf json = extractObject(ctx, in, in.readerIndex(), idxNoSpaces + 1 - in.readerIndex());
                     if (json != null) {
-                        out.add(json);
+                        ctx.fireChannelRead(json);
                     }
 
                     in.readerIndex(idx + 1);

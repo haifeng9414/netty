@@ -17,6 +17,7 @@ package io.netty.handler.ssl;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandlerContext;
+
 import io.netty.util.CharsetUtil;
 import io.netty.util.concurrent.Future;
 

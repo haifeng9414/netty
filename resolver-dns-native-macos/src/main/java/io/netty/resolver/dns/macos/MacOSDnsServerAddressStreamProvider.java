@@ -109,7 +109,7 @@ public final class MacOSDnsServerAddressStreamProvider implements DnsServerAddre
         if (resolvers == null || resolvers.length == 0) {
             return Collections.emptyMap();
         }
-        Map<String, DnsServerAddresses> resolverMap = new HashMap<String, DnsServerAddresses>(resolvers.length);
+        Map<String, DnsServerAddresses> resolverMap = new HashMap<>(resolvers.length);
         for (DnsResolver resolver: resolvers) {
             // Skip mdns
             if ("mdns".equalsIgnoreCase(resolver.options())) {

@@ -16,13 +16,16 @@
 
 package io.netty.util.internal;
 
+import static java.util.Objects.requireNonNull;
+
 import java.util.Iterator;
 
 public final class ReadOnlyIterator<T> implements Iterator<T> {
     private final Iterator<? extends T> iterator;
 
     public ReadOnlyIterator(Iterator<? extends T> iterator) {
-        this.iterator = ObjectUtil.checkNotNull(iterator, "iterator");
+        requireNonNull(iterator, "iterator");
+        this.iterator = iterator;
     }
 
     @Override

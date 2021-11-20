@@ -16,14 +16,13 @@
 
 package io.netty.handler.proxy;
 
-import io.netty.buffer.ByteBuf;
+import static java.util.Objects.requireNonNull;
+
 import io.netty.buffer.Unpooled;
+import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
-import io.netty.channel.ChannelInboundHandler;
-import io.netty.channel.ChannelOutboundHandler;
 import io.netty.channel.ChannelPipeline;
 import io.netty.channel.ChannelPromise;
-import io.netty.handler.codec.base64.Base64;
 import io.netty.handler.codec.http.DefaultFullHttpRequest;
 import io.netty.handler.codec.http.FullHttpRequest;
 import io.netty.handler.codec.http.HttpClientCodec;
@@ -36,16 +35,18 @@ import io.netty.handler.codec.http.HttpUtil;
 import io.netty.handler.codec.http.HttpVersion;
 import io.netty.handler.codec.http.LastHttpContent;
 import io.netty.util.AsciiString;
-import io.netty.util.CharsetUtil;
-import io.netty.util.internal.ObjectUtil;
 
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
+import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
+import java.util.Base64;
 
 public final class HttpProxyHandler extends ProxyHandler {
 
     private static final String PROTOCOL = "http";
     private static final String AUTH_BASIC = "basic";
+    private static final byte[] BASIC_BYTES = "Basic ".getBytes(StandardCharsets.UTF_8);
 
     // Wrapper for the HttpClientCodec to prevent it to be removed by other handlers by mistake (for example the
     // WebSocket*Handshaker.
@@ -96,21 +97,17 @@ public final class HttpProxyHandler extends ProxyHandler {
                             HttpHeaders headers,
                             boolean ignoreDefaultPortsInConnectHostHeader) {
         super(proxyAddress);
-        this.username = ObjectUtil.checkNotNull(username, "username");
-        this.password = ObjectUtil.checkNotNull(password, "password");
+        requireNonNull(username, "username");
+        requireNonNull(password, "password");
+        this.username = username;
+        this.password = password;
 
-        ByteBuf authz = Unpooled.copiedBuffer(username + ':' + password, CharsetUtil.UTF_8);
-        ByteBuf authzBase64;
-        try {
-            authzBase64 = Base64.encode(authz, false);
-        } finally {
-            authz.release();
-        }
-        try {
-            authorization = new AsciiString("Basic " + authzBase64.toString(CharsetUtil.US_ASCII));
-        } finally {
-            authzBase64.release();
-        }
+        byte[] authzBase64 = Base64.getEncoder().encode(
+                (username + ':' + password).getBytes(StandardCharsets.UTF_8));
+        byte[] authzHeader = Arrays.copyOf(BASIC_BYTES, 6 + authzBase64.length);
+        System.arraycopy(authzBase64, 0, authzHeader, 6, authzBase64.length);
+
+        authorization = new AsciiString(authzHeader, /*copy=*/ false);
 
         this.outboundHeaders = headers;
         this.ignoreDefaultPortsInConnectHostHeader = ignoreDefaultPortsInConnectHostHeader;
@@ -229,7 +226,7 @@ public final class HttpProxyHandler extends ProxyHandler {
         }
     }
 
-    private static final class HttpClientCodecWrapper implements ChannelInboundHandler, ChannelOutboundHandler {
+    private static final class HttpClientCodecWrapper implements ChannelHandler {
         final HttpClientCodec codec = new HttpClientCodec();
 
         @Override

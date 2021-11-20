@@ -16,9 +16,10 @@
 package io.netty.channel.epoll;
 
 import io.netty.bootstrap.ServerBootstrap;
-import io.netty.channel.ChannelInboundHandlerAdapter;
+import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelOption;
 import io.netty.channel.EventLoopGroup;
+import io.netty.channel.MultithreadEventLoopGroup;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -35,11 +36,11 @@ public class EpollServerSocketChannelConfigTest {
 
     @BeforeClass
     public static void before() {
-        group = new EpollEventLoopGroup(1);
+        group = new MultithreadEventLoopGroup(1, EpollHandler.newFactory());
         ServerBootstrap bootstrap = new ServerBootstrap();
         ch = (EpollServerSocketChannel) bootstrap.group(group)
                 .channel(EpollServerSocketChannel.class)
-                .childHandler(new ChannelInboundHandlerAdapter())
+                .childHandler(new ChannelHandler() { })
                 .bind(new InetSocketAddress(0)).syncUninterruptibly().channel();
     }
 

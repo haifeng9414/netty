@@ -184,7 +184,7 @@ public class SocketGatheringWriteTest extends AbstractSocketTest {
         }
 
         @Override
-        public void channelRead0(ChannelHandlerContext ctx, ByteBuf in) throws Exception {
+        public void messageReceived(ChannelHandlerContext ctx, ByteBuf in) throws Exception {
             received.writeBytes(in);
             if (received.readableBytes() >= expectedBytes) {
                 doneReadingPromise.setSuccess(null);
@@ -207,7 +207,7 @@ public class SocketGatheringWriteTest extends AbstractSocketTest {
     private static class TestHandler extends SimpleChannelInboundHandler<ByteBuf> {
         private final boolean autoRead;
         volatile Channel channel;
-        final AtomicReference<Throwable> exception = new AtomicReference<Throwable>();
+        final AtomicReference<Throwable> exception = new AtomicReference<>();
 
         TestHandler(boolean autoRead) {
             this.autoRead = autoRead;
@@ -223,7 +223,7 @@ public class SocketGatheringWriteTest extends AbstractSocketTest {
         }
 
         @Override
-        public void channelRead0(ChannelHandlerContext ctx, ByteBuf in) throws Exception {
+        public void messageReceived(ChannelHandlerContext ctx, ByteBuf in) throws Exception {
         }
 
         @Override

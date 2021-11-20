@@ -15,7 +15,8 @@
  */
 package io.netty.buffer;
 
-import io.netty.util.internal.ObjectUtil;
+import static java.util.Objects.requireNonNull;
+
 import io.netty.util.internal.StringUtil;
 
 /**
@@ -27,7 +28,8 @@ public class DefaultByteBufHolder implements ByteBufHolder {
     private final ByteBuf data;
 
     public DefaultByteBufHolder(ByteBuf data) {
-        this.data = ObjectUtil.checkNotNull(data, "data");
+        requireNonNull(data, "data");
+        this.data = data;
     }
 
     @Override

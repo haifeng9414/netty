@@ -25,11 +25,12 @@ import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelPipeline;
-import io.netty.channel.DefaultEventLoopGroup;
 import io.netty.channel.EventLoopGroup;
+import io.netty.channel.MultithreadEventLoopGroup;
 import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.channel.local.LocalAddress;
 import io.netty.channel.local.LocalChannel;
+import io.netty.channel.local.LocalHandler;
 import io.netty.channel.local.LocalServerChannel;
 import io.netty.handler.ssl.util.InsecureTrustManagerFactory;
 import io.netty.handler.ssl.util.SelfSignedCertificate;
@@ -61,7 +62,6 @@ import java.util.List;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -97,14 +97,9 @@ public class OpenSslPrivateKeyMethodTest {
         assumeCipherAvailable(SslProvider.OPENSSL);
         assumeCipherAvailable(SslProvider.JDK);
 
-        GROUP = new DefaultEventLoopGroup();
+        GROUP = new MultithreadEventLoopGroup(LocalHandler.newFactory());
         CERT = new SelfSignedCertificate();
-        EXECUTOR = Executors.newCachedThreadPool(new ThreadFactory() {
-            @Override
-            public Thread newThread(Runnable r) {
-                return new DelegateThread(r);
-            }
-        });
+        EXECUTOR = Executors.newCachedThreadPool(DelegateThread::new);
     }
 
     @AfterClass
@@ -239,7 +234,7 @@ public class OpenSslPrivateKeyMethodTest {
                             }
 
                             @Override
-                            public void channelRead0(ChannelHandlerContext ctx, Object msg) {
+                            public void messageReceived(ChannelHandlerContext ctx, Object msg) {
                                 if (serverPromise.trySuccess(null)) {
                                     ctx.writeAndFlush(Unpooled.wrappedBuffer(new byte[] {'P', 'O', 'N', 'G'}));
                                 }
@@ -275,7 +270,7 @@ public class OpenSslPrivateKeyMethodTest {
                                 }
 
                                 @Override
-                                public void channelRead0(ChannelHandlerContext ctx, Object msg) {
+                                public void messageReceived(ChannelHandlerContext ctx, Object msg) {
                                     clientPromise.trySuccess(null);
                                     ctx.close();
                                 }

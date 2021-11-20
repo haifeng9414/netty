@@ -15,9 +15,7 @@
  */
 package io.netty.handler.codec.http;
 
-import io.netty.util.internal.ObjectUtil;
-
-import static io.netty.util.internal.ObjectUtil.checkNotNull;
+import static java.util.Objects.requireNonNull;
 
 /**
  * The default {@link HttpRequest} implementation.
@@ -48,8 +46,8 @@ public class DefaultHttpRequest extends DefaultHttpMessage implements HttpReques
      */
     public DefaultHttpRequest(HttpVersion httpVersion, HttpMethod method, String uri, boolean validateHeaders) {
         super(httpVersion, validateHeaders, false);
-        this.method = checkNotNull(method, "method");
-        this.uri = checkNotNull(uri, "uri");
+        this.method = requireNonNull(method, "method");
+        this.uri = requireNonNull(uri, "uri");
     }
 
     /**
@@ -62,8 +60,8 @@ public class DefaultHttpRequest extends DefaultHttpMessage implements HttpReques
      */
     public DefaultHttpRequest(HttpVersion httpVersion, HttpMethod method, String uri, HttpHeaders headers) {
         super(httpVersion, headers);
-        this.method = checkNotNull(method, "method");
-        this.uri = checkNotNull(uri, "uri");
+        this.method = requireNonNull(method, "method");
+        this.uri = requireNonNull(uri, "uri");
     }
 
     @Override
@@ -90,13 +88,15 @@ public class DefaultHttpRequest extends DefaultHttpMessage implements HttpReques
 
     @Override
     public HttpRequest setMethod(HttpMethod method) {
-        this.method = ObjectUtil.checkNotNull(method, "method");
+        requireNonNull(method, "method");
+        this.method = method;
         return this;
     }
 
     @Override
     public HttpRequest setUri(String uri) {
-        this.uri = ObjectUtil.checkNotNull(uri, "uri");
+        requireNonNull(uri, "uri");
+        this.uri = uri;
         return this;
     }
 

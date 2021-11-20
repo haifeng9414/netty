@@ -17,7 +17,6 @@ package io.netty.handler.codec.http.multipart;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufUtil;
-import io.netty.util.internal.PlatformDependent;
 import org.junit.Test;
 
 import java.io.File;
@@ -25,6 +24,7 @@ import java.io.FileOutputStream;
 import java.nio.charset.Charset;
 import java.util.Arrays;
 import java.util.UUID;
+import java.util.concurrent.ThreadLocalRandom;
 
 import static io.netty.util.CharsetUtil.UTF_8;
 import static org.junit.Assert.assertEquals;
@@ -43,7 +43,7 @@ public class AbstractDiskHttpDataTest {
             tmpFile.deleteOnExit();
             FileOutputStream fos = new FileOutputStream(tmpFile);
             byte[] bytes = new byte[4096];
-            PlatformDependent.threadLocalRandom().nextBytes(bytes);
+            ThreadLocalRandom.current().nextBytes(bytes);
             try {
                 fos.write(bytes);
                 fos.flush();

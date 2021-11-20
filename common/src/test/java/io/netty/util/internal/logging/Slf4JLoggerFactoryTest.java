@@ -19,7 +19,6 @@ import org.junit.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.ArgumentMatchers;
 import org.slf4j.Logger;
-import org.slf4j.Marker;
 import org.slf4j.spi.LocationAwareLogger;
 
 import java.util.Iterator;
@@ -88,21 +87,21 @@ public class Slf4JLoggerFactoryTest {
         internalLogger.warn("{} {}", "warn1", "warn2");
         internalLogger.warn("{} {} {}", "warn1", "warn2", "warn3");
 
-        verify(logger, times(3)).log(ArgumentMatchers.<Marker>isNull(), eq(LocationAwareSlf4JLogger.FQCN),
+        verify(logger, times(3)).log(ArgumentMatchers.isNull(), eq(LocationAwareSlf4JLogger.FQCN),
                 eq(LocationAwareLogger.DEBUG_INT), captor.capture(), any(Object[].class),
-                ArgumentMatchers.<Throwable>isNull());
-        verify(logger, times(3)).log(ArgumentMatchers.<Marker>isNull(), eq(LocationAwareSlf4JLogger.FQCN),
+                ArgumentMatchers.isNull());
+        verify(logger, times(3)).log(ArgumentMatchers.isNull(), eq(LocationAwareSlf4JLogger.FQCN),
                 eq(LocationAwareLogger.ERROR_INT), captor.capture(), any(Object[].class),
-                ArgumentMatchers.<Throwable>isNull());
-        verify(logger, times(3)).log(ArgumentMatchers.<Marker>isNull(), eq(LocationAwareSlf4JLogger.FQCN),
+                ArgumentMatchers.isNull());
+        verify(logger, times(3)).log(ArgumentMatchers.isNull(), eq(LocationAwareSlf4JLogger.FQCN),
                 eq(LocationAwareLogger.INFO_INT), captor.capture(), any(Object[].class),
-                ArgumentMatchers.<Throwable>isNull());
-        verify(logger, times(3)).log(ArgumentMatchers.<Marker>isNull(), eq(LocationAwareSlf4JLogger.FQCN),
+                ArgumentMatchers.isNull());
+        verify(logger, times(3)).log(ArgumentMatchers.isNull(), eq(LocationAwareSlf4JLogger.FQCN),
                 eq(LocationAwareLogger.TRACE_INT), captor.capture(), any(Object[].class),
-                ArgumentMatchers.<Throwable>isNull());
-        verify(logger, times(3)).log(ArgumentMatchers.<Marker>isNull(), eq(LocationAwareSlf4JLogger.FQCN),
+                ArgumentMatchers.isNull());
+        verify(logger, times(3)).log(ArgumentMatchers.isNull(), eq(LocationAwareSlf4JLogger.FQCN),
                 eq(LocationAwareLogger.WARN_INT), captor.capture(), any(Object[].class),
-                ArgumentMatchers.<Throwable>isNull());
+                ArgumentMatchers.isNull());
 
         Iterator<String> logMessages = captor.getAllValues().iterator();
         assertEquals("debug", logMessages.next());

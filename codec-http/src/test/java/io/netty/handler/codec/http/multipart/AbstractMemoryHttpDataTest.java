@@ -19,7 +19,6 @@ import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufInputStream;
 import io.netty.buffer.ByteBufUtil;
 import io.netty.buffer.Unpooled;
-import io.netty.util.internal.PlatformDependent;
 
 import org.junit.Test;
 
@@ -32,6 +31,7 @@ import java.security.SecureRandom;
 import java.util.Arrays;
 import java.util.Random;
 import java.util.UUID;
+import java.util.concurrent.ThreadLocalRandom;
 
 import static io.netty.util.CharsetUtil.*;
 import static org.junit.Assert.*;
@@ -47,7 +47,7 @@ public class AbstractMemoryHttpDataTest {
             tmpFile.deleteOnExit();
             FileOutputStream fos = new FileOutputStream(tmpFile);
             byte[] bytes = new byte[4096];
-            PlatformDependent.threadLocalRandom().nextBytes(bytes);
+            ThreadLocalRandom.current().nextBytes(bytes);
             try {
                 fos.write(bytes);
                 fos.flush();
@@ -74,7 +74,7 @@ public class AbstractMemoryHttpDataTest {
             tmpFile.deleteOnExit();
             final int totalByteCount = 4096;
             byte[] bytes = new byte[totalByteCount];
-            PlatformDependent.threadLocalRandom().nextBytes(bytes);
+            ThreadLocalRandom.current().nextBytes(bytes);
             ByteBuf content = Unpooled.wrappedBuffer(bytes);
             test.setContent(content);
             boolean succ = test.renameTo(tmpFile);
@@ -113,16 +113,14 @@ public class AbstractMemoryHttpDataTest {
         TestHttpData test = new TestHttpData("test", UTF_8, 0);
         String contentStr = "foo_test";
         ByteBuf buf = Unpooled.wrappedBuffer(contentStr.getBytes(UTF_8));
-        buf.markReaderIndex();
-        ByteBufInputStream is = new ByteBufInputStream(buf);
-        try {
+        int readerIndex = buf.readerIndex();
+
+        try (ByteBufInputStream is = new ByteBufInputStream(buf)) {
             test.setContent(is);
             assertFalse(buf.isReadable());
             assertEquals(test.getString(UTF_8), contentStr);
-            buf.resetReaderIndex();
+            buf.readerIndex(readerIndex);
             assertTrue(ByteBufUtil.equals(buf, test.getByteBuf()));
-        } finally {
-            is.close();
         }
 
         Random random = new SecureRandom();

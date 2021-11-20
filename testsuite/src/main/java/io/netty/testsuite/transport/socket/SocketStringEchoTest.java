@@ -131,7 +131,7 @@ public class SocketStringEchoTest extends AbstractSocketTest {
         private final Promise<Void> donePromise;
         private int dataIndex;
         volatile Channel channel;
-        final AtomicReference<Throwable> exception = new AtomicReference<Throwable>();
+        final AtomicReference<Throwable> exception = new AtomicReference<>();
 
         StringEchoHandler(boolean autoRead, Promise<Void> donePromise) {
             this.autoRead = autoRead;
@@ -147,7 +147,7 @@ public class SocketStringEchoTest extends AbstractSocketTest {
         }
 
         @Override
-        public void channelRead0(ChannelHandlerContext ctx, String msg) throws Exception {
+        public void messageReceived(ChannelHandlerContext ctx, String msg) throws Exception {
             if (!data[dataIndex].equals(msg)) {
                 donePromise.tryFailure(new IllegalStateException("index: " + dataIndex + " didn't match!"));
                 ctx.close();

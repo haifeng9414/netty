@@ -31,7 +31,7 @@ import io.netty.util.concurrent.EventExecutor;
 
 import java.net.SocketAddress;
 
-import static io.netty.util.internal.ObjectUtil.checkNotNull;
+import static java.util.Objects.requireNonNull;
 
 public abstract class EmbeddedChannelHandlerContext implements ChannelHandlerContext {
     private static final String HANDLER_NAME = "microbench-delegator-ctx";
@@ -42,10 +42,10 @@ public abstract class EmbeddedChannelHandlerContext implements ChannelHandlerCon
     private SocketAddress localAddress;
 
     protected EmbeddedChannelHandlerContext(ByteBufAllocator alloc, ChannelHandler handler, EmbeddedChannel channel) {
-        this.alloc = checkNotNull(alloc, "alloc");
-        this.channel = checkNotNull(channel, "channel");
-        this.handler = checkNotNull(handler, "handler");
-        this.eventLoop = checkNotNull(channel.eventLoop(), "eventLoop");
+        this.alloc = requireNonNull(alloc, "alloc");
+        this.channel = requireNonNull(channel, "channel");
+        this.handler = requireNonNull(handler, "handler");
+        eventLoop = requireNonNull(channel.eventLoop(), "eventLoop");
     }
 
     protected abstract void handleException(Throwable t);
@@ -112,7 +112,7 @@ public abstract class EmbeddedChannelHandlerContext implements ChannelHandlerCon
         } catch (Exception e) {
             handleException(e);
         }
-        return null;
+        return this;
     }
 
     @Override
@@ -160,6 +160,22 @@ public abstract class EmbeddedChannelHandlerContext implements ChannelHandlerCon
     @Override
     public final ChannelFuture close() {
         return close(newPromise());
+    }
+
+    @Override
+    public ChannelFuture register() {
+        return register(newPromise());
+    }
+
+    @Override
+    public ChannelFuture register(ChannelPromise promise) {
+        try {
+            channel().register(promise);
+        } catch (Exception e) {
+            promise.setFailure(e);
+            handleException(e);
+        }
+        return promise;
     }
 
     @Override

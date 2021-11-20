@@ -16,8 +16,9 @@
 
 package io.netty.buffer;
 
+import static java.util.Objects.requireNonNull;
+
 import io.netty.util.ByteProcessor;
-import io.netty.util.internal.ObjectUtil;
 import io.netty.util.internal.StringUtil;
 
 import java.io.IOException;
@@ -42,7 +43,8 @@ class WrappedByteBuf extends ByteBuf {
     protected final ByteBuf buf;
 
     protected WrappedByteBuf(ByteBuf buf) {
-        this.buf = ObjectUtil.checkNotNull(buf, "buf");
+        requireNonNull(buf, "buf");
+        this.buf = buf;
     }
 
     @Override
@@ -172,30 +174,6 @@ class WrappedByteBuf extends ByteBuf {
     @Override
     public final ByteBuf clear() {
         buf.clear();
-        return this;
-    }
-
-    @Override
-    public final ByteBuf markReaderIndex() {
-        buf.markReaderIndex();
-        return this;
-    }
-
-    @Override
-    public final ByteBuf resetReaderIndex() {
-        buf.resetReaderIndex();
-        return this;
-    }
-
-    @Override
-    public final ByteBuf markWriterIndex() {
-        buf.markWriterIndex();
-        return this;
-    }
-
-    @Override
-    public final ByteBuf resetWriterIndex() {
-        buf.resetWriterIndex();
         return this;
     }
 

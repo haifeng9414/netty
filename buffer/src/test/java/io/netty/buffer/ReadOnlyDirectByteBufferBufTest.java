@@ -15,7 +15,6 @@
  */
 package io.netty.buffer;
 
-import io.netty.util.internal.PlatformDependent;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -26,6 +25,7 @@ import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.ReadOnlyBufferException;
 import java.nio.channels.FileChannel;
+import java.util.concurrent.ThreadLocalRandom;
 
 public class ReadOnlyDirectByteBufferBufTest {
 
@@ -315,7 +315,7 @@ public class ReadOnlyDirectByteBufferBufTest {
         try {
             output = new RandomAccessFile(file, "rw").getChannel();
             byte[] bytes = new byte[1024];
-            PlatformDependent.threadLocalRandom().nextBytes(bytes);
+            ThreadLocalRandom.current().nextBytes(bytes);
             output.write(ByteBuffer.wrap(bytes));
 
             input = new RandomAccessFile(file, "r").getChannel();

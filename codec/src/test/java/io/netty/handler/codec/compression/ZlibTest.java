@@ -24,13 +24,13 @@ import io.netty.channel.embedded.EmbeddedChannel;
 import io.netty.util.CharsetUtil;
 import io.netty.util.ReferenceCountUtil;
 import io.netty.util.internal.EmptyArrays;
-import io.netty.util.internal.PlatformDependent;
 import org.junit.Test;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.Random;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.zip.DeflaterOutputStream;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
@@ -85,7 +85,7 @@ public abstract class ZlibTest {
             "</body></html>").getBytes(CharsetUtil.UTF_8);
 
     static {
-        Random rand = PlatformDependent.threadLocalRandom();
+        Random rand = ThreadLocalRandom.current();
         rand.nextBytes(BYTES_SMALL);
         rand.nextBytes(BYTES_LARGE);
     }
@@ -124,7 +124,7 @@ public abstract class ZlibTest {
         try {
             chEncoder.writeOutbound(data.retain());
             chEncoder.flush();
-            data.resetReaderIndex();
+            data.readerIndex(0);
 
             for (;;) {
                 ByteBuf deflatedData = chEncoder.readOutbound();

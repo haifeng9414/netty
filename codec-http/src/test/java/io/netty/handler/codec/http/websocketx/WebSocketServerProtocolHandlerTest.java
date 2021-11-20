@@ -18,8 +18,6 @@ package io.netty.handler.codec.http.websocketx;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
-import io.netty.channel.ChannelInboundHandlerAdapter;
-import io.netty.channel.ChannelOutboundHandlerAdapter;
 import io.netty.channel.ChannelPromise;
 import io.netty.channel.embedded.EmbeddedChannel;
 import io.netty.handler.codec.http.DefaultFullHttpRequest;
@@ -47,7 +45,7 @@ import static org.junit.Assert.*;
 
 public class WebSocketServerProtocolHandlerTest {
 
-    private final Queue<FullHttpResponse> responses = new ArrayDeque<FullHttpResponse>();
+    private final Queue<FullHttpResponse> responses = new ArrayDeque<>();
 
     @Before
     public void setUp() {
@@ -68,15 +66,15 @@ public class WebSocketServerProtocolHandlerTest {
     }
 
     @Test
-    public void testWebSocketServerProtocolHandshakeHandlerReplacedBeforeHandshake() {
+    public void testWebSocketServerProtocolHandshakeHandlerRemovedAfterHandshake() {
         EmbeddedChannel ch = createChannel(new MockOutboundHandler());
         ChannelHandlerContext handshakerCtx = ch.pipeline().context(WebSocketServerProtocolHandshakeHandler.class);
-        ch.pipeline().addLast(new ChannelInboundHandlerAdapter() {
+        ch.pipeline().addLast(new ChannelHandler() {
             @Override
             public void userEventTriggered(ChannelHandlerContext ctx, Object evt) {
                 if (evt instanceof WebSocketServerProtocolHandler.HandshakeComplete) {
                     // We should have removed the handler already.
-                    assertNull(ctx.pipeline().context(WebSocketServerProtocolHandshakeHandler.class));
+                    ctx.executor().execute(() -> ctx.pipeline().context(WebSocketServerProtocolHandshakeHandler.class));
                 }
             }
         });
@@ -200,15 +198,15 @@ public class WebSocketServerProtocolHandlerTest {
         EmbeddedChannel client = createClient();
         EmbeddedChannel server = createServer();
 
-        assertFalse(server.writeInbound(client.readOutbound()));
-        assertFalse(client.writeInbound(server.readOutbound()));
+        assertFalse(server.writeInbound((ByteBuf) client.readOutbound()));
+        assertFalse(client.writeInbound((ByteBuf) server.readOutbound()));
 
         // When server channel closed with explicit close-frame
         assertTrue(server.writeOutbound(new CloseWebSocketFrame(closeStatus)));
         server.close();
 
         // Then client receives provided close-frame
-        assertTrue(client.writeInbound(server.readOutbound()));
+        assertTrue(client.writeInbound((ByteBuf) server.readOutbound()));
         assertFalse(server.isOpen());
 
         CloseWebSocketFrame closeMessage = client.readInbound();
@@ -226,14 +224,14 @@ public class WebSocketServerProtocolHandlerTest {
         EmbeddedChannel client = createClient();
         EmbeddedChannel server = createServer();
 
-        assertFalse(server.writeInbound(client.readOutbound()));
-        assertFalse(client.writeInbound(server.readOutbound()));
+        assertFalse(server.writeInbound((ByteBuf) client.readOutbound()));
+        assertFalse(client.writeInbound((ByteBuf) server.readOutbound()));
 
         // When server channel closed without explicit close-frame
         server.close();
 
         // Then client receives NORMAL_CLOSURE close-frame
-        assertTrue(client.writeInbound(server.readOutbound()));
+        assertTrue(client.writeInbound((ByteBuf) server.readOutbound()));
         assertFalse(server.isOpen());
 
         CloseWebSocketFrame closeMessage = client.readInbound();
@@ -252,15 +250,15 @@ public class WebSocketServerProtocolHandlerTest {
         EmbeddedChannel client = createClient();
         EmbeddedChannel server = createServer();
 
-        assertFalse(server.writeInbound(client.readOutbound()));
-        assertFalse(client.writeInbound(server.readOutbound()));
+        assertFalse(server.writeInbound((ByteBuf) client.readOutbound()));
+        assertFalse(client.writeInbound((ByteBuf) server.readOutbound()));
 
         // When client channel closed with explicit close-frame
         assertTrue(client.writeOutbound(new CloseWebSocketFrame(closeStatus)));
         client.close();
 
         // Then client receives provided close-frame
-        assertFalse(server.writeInbound(client.readOutbound()));
+        assertFalse(server.writeInbound((ByteBuf) client.readOutbound()));
         assertFalse(client.isOpen());
         assertFalse(server.isOpen());
 
@@ -277,14 +275,14 @@ public class WebSocketServerProtocolHandlerTest {
         EmbeddedChannel client = createClient();
         EmbeddedChannel server = createServer();
 
-        assertFalse(server.writeInbound(client.readOutbound()));
-        assertFalse(client.writeInbound(server.readOutbound()));
+        assertFalse(server.writeInbound((ByteBuf) client.readOutbound()));
+        assertFalse(client.writeInbound((ByteBuf) server.readOutbound()));
 
         // When client channel closed without explicit close-frame
         client.close();
 
         // Then server receives NORMAL_CLOSURE close-frame
-        assertFalse(server.writeInbound(client.readOutbound()));
+        assertFalse(server.writeInbound((ByteBuf) client.readOutbound()));
         assertFalse(client.isOpen());
         assertFalse(server.isOpen());
 
@@ -362,7 +360,7 @@ public class WebSocketServerProtocolHandlerTest {
         return response.content().toString(CharsetUtil.UTF_8);
     }
 
-    private class MockOutboundHandler extends ChannelOutboundHandlerAdapter {
+    private class MockOutboundHandler implements ChannelHandler {
 
         @Override
         public void write(ChannelHandlerContext ctx, Object msg, ChannelPromise promise) {
@@ -375,7 +373,7 @@ public class WebSocketServerProtocolHandlerTest {
         }
     }
 
-    private static class CustomTextFrameHandler extends ChannelInboundHandlerAdapter {
+    private static class CustomTextFrameHandler implements ChannelHandler {
         private String content;
 
         @Override

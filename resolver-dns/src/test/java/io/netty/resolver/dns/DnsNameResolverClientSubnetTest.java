@@ -16,10 +16,10 @@
 package io.netty.resolver.dns;
 
 import io.netty.channel.EventLoopGroup;
-import io.netty.channel.nio.NioEventLoopGroup;
+import io.netty.channel.MultithreadEventLoopGroup;
+import io.netty.channel.nio.NioHandler;
 import io.netty.channel.socket.nio.NioDatagramChannel;
 import io.netty.handler.codec.dns.DefaultDnsOptEcsRecord;
-import io.netty.handler.codec.dns.DnsRecord;
 import io.netty.util.internal.SocketUtils;
 import io.netty.util.concurrent.Future;
 import org.junit.Ignore;
@@ -37,13 +37,13 @@ public class DnsNameResolverClientSubnetTest {
     @Ignore
     @Test
     public void testSubnetQuery() throws Exception {
-        EventLoopGroup group = new NioEventLoopGroup(1);
+        EventLoopGroup group = new MultithreadEventLoopGroup(1, NioHandler.newFactory());
         DnsNameResolver resolver = newResolver(group).build();
         try {
             // Same as:
             // # /.bind-9.9.3-edns/bin/dig @ns1.google.com www.google.es +client=157.88.0.0/24
             Future<List<InetAddress>> future = resolver.resolveAll("www.google.es",
-                    Collections.<DnsRecord>singleton(
+                    Collections.singleton(
                             // Suggest max payload size of 1024
                             // 157.88.0.0 / 24
                             new DefaultDnsOptEcsRecord(1024, 24,

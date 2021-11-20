@@ -15,6 +15,8 @@
  */
 package io.netty.handler.codec.protobuf;
 
+import static java.util.Objects.requireNonNull;
+
 import com.google.protobuf.ExtensionRegistry;
 import com.google.protobuf.ExtensionRegistryLite;
 import com.google.protobuf.Message;
@@ -28,9 +30,6 @@ import io.netty.handler.codec.ByteToMessageDecoder;
 import io.netty.handler.codec.LengthFieldBasedFrameDecoder;
 import io.netty.handler.codec.LengthFieldPrepender;
 import io.netty.handler.codec.MessageToMessageDecoder;
-import io.netty.util.internal.ObjectUtil;
-
-import java.util.List;
 
 /**
  * Decodes a received {@link ByteBuf} into a
@@ -96,13 +95,13 @@ public class ProtobufDecoder extends MessageToMessageDecoder<ByteBuf> {
     }
 
     public ProtobufDecoder(MessageLite prototype, ExtensionRegistryLite extensionRegistry) {
-        this.prototype = ObjectUtil.checkNotNull(prototype, "prototype").getDefaultInstanceForType();
+        requireNonNull(prototype, "prototype");
+        this.prototype = prototype.getDefaultInstanceForType();
         this.extensionRegistry = extensionRegistry;
     }
 
     @Override
-    protected void decode(ChannelHandlerContext ctx, ByteBuf msg, List<Object> out)
-            throws Exception {
+    protected void decode(ChannelHandlerContext ctx, ByteBuf msg) throws Exception {
         final byte[] array;
         final int offset;
         final int length = msg.readableBytes();
@@ -116,16 +115,16 @@ public class ProtobufDecoder extends MessageToMessageDecoder<ByteBuf> {
 
         if (extensionRegistry == null) {
             if (HAS_PARSER) {
-                out.add(prototype.getParserForType().parseFrom(array, offset, length));
+                ctx.fireChannelRead(prototype.getParserForType().parseFrom(array, offset, length));
             } else {
-                out.add(prototype.newBuilderForType().mergeFrom(array, offset, length).build());
+                ctx.fireChannelRead(prototype.newBuilderForType().mergeFrom(array, offset, length).build());
             }
         } else {
             if (HAS_PARSER) {
-                out.add(prototype.getParserForType().parseFrom(
+                ctx.fireChannelRead(prototype.getParserForType().parseFrom(
                         array, offset, length, extensionRegistry));
             } else {
-                out.add(prototype.newBuilderForType().mergeFrom(
+                ctx.fireChannelRead(prototype.newBuilderForType().mergeFrom(
                         array, offset, length, extensionRegistry).build());
             }
         }

@@ -16,23 +16,17 @@
 package io.netty.handler.codec.http.websocketx;
 
 
-import io.netty.channel.ChannelFuture;
-import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
-import io.netty.channel.ChannelOutboundHandler;
 import io.netty.channel.ChannelPromise;
 import io.netty.channel.ChannelPromiseNotifier;
 import io.netty.handler.codec.MessageToMessageDecoder;
 import io.netty.util.ReferenceCountUtil;
 import io.netty.util.concurrent.ScheduledFuture;
 
-import java.net.SocketAddress;
 import java.nio.channels.ClosedChannelException;
-import java.util.List;
 import java.util.concurrent.TimeUnit;
 
-abstract class WebSocketProtocolHandler extends MessageToMessageDecoder<WebSocketFrame>
-        implements ChannelOutboundHandler {
+abstract class WebSocketProtocolHandler extends MessageToMessageDecoder<WebSocketFrame> {
 
     private final boolean dropPongFrames;
     private final WebSocketCloseStatus closeStatus;
@@ -66,7 +60,7 @@ abstract class WebSocketProtocolHandler extends MessageToMessageDecoder<WebSocke
     }
 
     @Override
-    protected void decode(ChannelHandlerContext ctx, WebSocketFrame frame, List<Object> out) throws Exception {
+    protected void decode(ChannelHandlerContext ctx, WebSocketFrame frame) throws Exception {
         if (frame instanceof PingWebSocketFrame) {
             frame.content().retain();
             ctx.channel().writeAndFlush(new PongWebSocketFrame(frame.content()));
@@ -78,7 +72,7 @@ abstract class WebSocketProtocolHandler extends MessageToMessageDecoder<WebSocke
             return;
         }
 
-        out.add(frame.retain());
+        ctx.fireChannelRead(frame.retain());
     }
 
     private static void readIfNeeded(ChannelHandlerContext ctx) {
@@ -97,12 +91,7 @@ abstract class WebSocketProtocolHandler extends MessageToMessageDecoder<WebSocke
             }
             flush(ctx);
             applyCloseSentTimeout(ctx);
-            closeSent.addListener(new ChannelFutureListener() {
-                @Override
-                public void operationComplete(ChannelFuture future) {
-                    ctx.close(promise);
-                }
-            });
+            closeSent.addListener(future -> ctx.close(promise));
         }
     }
 
@@ -124,54 +113,13 @@ abstract class WebSocketProtocolHandler extends MessageToMessageDecoder<WebSocke
             return;
         }
 
-        final ScheduledFuture<?> timeoutTask = ctx.executor().schedule(new Runnable() {
-            @Override
-            public void run() {
-                if (!closeSent.isDone()) {
-                    closeSent.tryFailure(new WebSocketHandshakeException("send close frame timed out"));
-                }
+        final ScheduledFuture<?> timeoutTask = ctx.executor().schedule(() -> {
+            if (!closeSent.isDone()) {
+                closeSent.tryFailure(new WebSocketHandshakeException("send close frame timed out"));
             }
         }, forceCloseTimeoutMillis, TimeUnit.MILLISECONDS);
 
-        closeSent.addListener(new ChannelFutureListener() {
-            @Override
-            public void operationComplete(ChannelFuture future) {
-                timeoutTask.cancel(false);
-            }
-        });
-    }
-
-    @Override
-    public void bind(ChannelHandlerContext ctx, SocketAddress localAddress,
-                     ChannelPromise promise) throws Exception {
-        ctx.bind(localAddress, promise);
-    }
-
-    @Override
-    public void connect(ChannelHandlerContext ctx, SocketAddress remoteAddress,
-                        SocketAddress localAddress, ChannelPromise promise) throws Exception {
-        ctx.connect(remoteAddress, localAddress, promise);
-    }
-
-    @Override
-    public void disconnect(ChannelHandlerContext ctx, ChannelPromise promise)
-            throws Exception {
-        ctx.disconnect(promise);
-    }
-
-    @Override
-    public void deregister(ChannelHandlerContext ctx, ChannelPromise promise) throws Exception {
-        ctx.deregister(promise);
-    }
-
-    @Override
-    public void read(ChannelHandlerContext ctx) throws Exception {
-        ctx.read();
-    }
-
-    @Override
-    public void flush(ChannelHandlerContext ctx) throws Exception {
-        ctx.flush();
+        closeSent.addListener(future -> timeoutTask.cancel(false));
     }
 
     @Override

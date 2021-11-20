@@ -205,7 +205,7 @@ final class PoolChunk<T> implements PoolChunkMetric {
         long initHandle = (long) pages << SIZE_SHIFT;
         insertAvailRun(0, pages, initHandle);
 
-        cachedNioBuffers = new ArrayDeque<ByteBuffer>(8);
+        cachedNioBuffers = new ArrayDeque<>(8);
     }
 
     /** Creates a special chunk that is not pooled. */

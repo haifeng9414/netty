@@ -47,14 +47,9 @@ import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
 import java.util.Queue;
-import java.util.Random;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedDeque;
-import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -115,7 +110,6 @@ public final class PlatformDependent {
     private static final boolean USE_DIRECT_BUFFER_NO_CLEANER;
     private static final AtomicLong DIRECT_MEMORY_COUNTER;
     private static final long DIRECT_MEMORY_LIMIT;
-    private static final ThreadLocalRandomProvider RANDOM_PROVIDER;
     private static final Cleaner CLEANER;
     private static final int UNINITIALIZED_ARRAY_ALLOCATION_THRESHOLD;
     // For specifications, see https://www.freedesktop.org/software/systemd/man/os-release.html
@@ -124,31 +118,11 @@ public final class PlatformDependent {
     private static final String LINUX_ID_LIKE_PREFIX = "ID_LIKE=";
     public static final boolean BIG_ENDIAN_NATIVE_ORDER = ByteOrder.nativeOrder() == ByteOrder.BIG_ENDIAN;
 
-    private static final Cleaner NOOP = new Cleaner() {
-        @Override
-        public void freeDirectBuffer(ByteBuffer buffer) {
-            // NOOP
-        }
+    private static final Cleaner NOOP = buffer -> {
+        // NOOP
     };
 
     static {
-        if (javaVersion() >= 7) {
-            RANDOM_PROVIDER = new ThreadLocalRandomProvider() {
-                @Override
-                @SuppressJava6Requirement(reason = "Usage guarded by java version check")
-                public Random current() {
-                    return java.util.concurrent.ThreadLocalRandom.current();
-                }
-            };
-        } else {
-            RANDOM_PROVIDER = new ThreadLocalRandomProvider() {
-                @Override
-                public Random current() {
-                    return ThreadLocalRandom.current();
-                }
-            };
-        }
-
         // Here is how the system property is used:
         //
         // * <  0  - Don't use cleaner, and inherit max direct memory from java. In this case the
@@ -220,50 +194,47 @@ public final class PlatformDependent {
         final Set<String> availableClassifiers = new LinkedHashSet<String>();
         for (final String osReleaseFileName : OS_RELEASE_FILES) {
             final File file = new File(osReleaseFileName);
-            boolean found = AccessController.doPrivileged(new PrivilegedAction<Boolean>() {
-                @Override
-                public Boolean run() {
-                    try {
-                        if (file.exists()) {
-                            BufferedReader reader = null;
-                            try {
-                                reader = new BufferedReader(
-                                        new InputStreamReader(
-                                                new FileInputStream(file), CharsetUtil.UTF_8));
+            boolean found = AccessController.doPrivileged((PrivilegedAction<Boolean>) () -> {
+                try {
+                    if (file.exists()) {
+                        BufferedReader reader = null;
+                        try {
+                            reader = new BufferedReader(
+                                    new InputStreamReader(
+                                            new FileInputStream(file), CharsetUtil.UTF_8));
 
-                                String line;
-                                while ((line = reader.readLine()) != null) {
-                                    if (line.startsWith(LINUX_ID_PREFIX)) {
-                                        String id = normalizeOsReleaseVariableValue(
-                                                line.substring(LINUX_ID_PREFIX.length()));
-                                        addClassifier(allowedClassifiers, availableClassifiers, id);
-                                    } else if (line.startsWith(LINUX_ID_LIKE_PREFIX)) {
-                                        line = normalizeOsReleaseVariableValue(
-                                                line.substring(LINUX_ID_LIKE_PREFIX.length()));
-                                        addClassifier(allowedClassifiers, availableClassifiers, line.split("[ ]+"));
-                                    }
-                                }
-                            } catch (SecurityException e) {
-                                logger.debug("Unable to read {}", osReleaseFileName, e);
-                            } catch (IOException e) {
-                                logger.debug("Error while reading content of {}", osReleaseFileName, e);
-                            } finally {
-                                if (reader != null) {
-                                    try {
-                                        reader.close();
-                                    } catch (IOException ignored) {
-                                        // Ignore
-                                    }
+                            String line;
+                            while ((line = reader.readLine()) != null) {
+                                if (line.startsWith(LINUX_ID_PREFIX)) {
+                                    String id = normalizeOsReleaseVariableValue(
+                                            line.substring(LINUX_ID_PREFIX.length()));
+                                    addClassifier(allowedClassifiers, availableClassifiers, id);
+                                } else if (line.startsWith(LINUX_ID_LIKE_PREFIX)) {
+                                    line = normalizeOsReleaseVariableValue(
+                                            line.substring(LINUX_ID_LIKE_PREFIX.length()));
+                                    addClassifier(allowedClassifiers, availableClassifiers, line.split("[ ]+"));
                                 }
                             }
-                            // specification states we should only fall back if /etc/os-release does not exist
-                            return true;
+                        } catch (SecurityException e) {
+                            logger.debug("Unable to read {}", osReleaseFileName, e);
+                        } catch (IOException e) {
+                            logger.debug("Error while reading content of {}", osReleaseFileName, e);
+                        } finally {
+                            if (reader != null) {
+                                try {
+                                    reader.close();
+                                } catch (IOException ignored) {
+                                    // Ignore
+                                }
+                            }
                         }
-                    } catch (SecurityException e) {
-                        logger.debug("Unable to check if {} exists", osReleaseFileName, e);
+                        // specification states we should only fall back if /etc/os-release does not exist
+                        return true;
                     }
-                    return false;
+                } catch (SecurityException e) {
+                    logger.debug("Unable to check if {} exists", osReleaseFileName, e);
                 }
+                return false;
             });
 
             if (found) {
@@ -419,60 +390,13 @@ public final class PlatformDependent {
         if (hasUnsafe()) {
             PlatformDependent0.throwException(t);
         } else {
-            PlatformDependent.<RuntimeException>throwException0(t);
+            PlatformDependent.throwException0(t);
         }
     }
 
     @SuppressWarnings("unchecked")
     private static <E extends Throwable> void throwException0(Throwable t) throws E {
         throw (E) t;
-    }
-
-    /**
-     * Creates a new fastest {@link ConcurrentMap} implementation for the current platform.
-     */
-    public static <K, V> ConcurrentMap<K, V> newConcurrentHashMap() {
-        return new ConcurrentHashMap<K, V>();
-    }
-
-    /**
-     * Creates a new fastest {@link LongCounter} implementation for the current platform.
-     */
-    public static LongCounter newLongCounter() {
-        if (javaVersion() >= 8) {
-            return new LongAdderCounter();
-        } else {
-            return new AtomicLongCounter();
-        }
-    }
-
-    /**
-     * Creates a new fastest {@link ConcurrentMap} implementation for the current platform.
-     */
-    public static <K, V> ConcurrentMap<K, V> newConcurrentHashMap(int initialCapacity) {
-        return new ConcurrentHashMap<K, V>(initialCapacity);
-    }
-
-    /**
-     * Creates a new fastest {@link ConcurrentMap} implementation for the current platform.
-     */
-    public static <K, V> ConcurrentMap<K, V> newConcurrentHashMap(int initialCapacity, float loadFactor) {
-        return new ConcurrentHashMap<K, V>(initialCapacity, loadFactor);
-    }
-
-    /**
-     * Creates a new fastest {@link ConcurrentMap} implementation for the current platform.
-     */
-    public static <K, V> ConcurrentMap<K, V> newConcurrentHashMap(
-            int initialCapacity, float loadFactor, int concurrencyLevel) {
-        return new ConcurrentHashMap<K, V>(initialCapacity, loadFactor, concurrencyLevel);
-    }
-
-    /**
-     * Creates a new fastest {@link ConcurrentMap} implementation for the current platform.
-     */
-    public static <K, V> ConcurrentMap<K, V> newConcurrentHashMap(Map<? extends K, ? extends V> map) {
-        return new ConcurrentHashMap<K, V>(map);
     }
 
     /**
@@ -916,12 +840,9 @@ public final class PlatformDependent {
                 // jctools goes through its own process of initializing unsafe; of
                 // course, this requires permissions which might not be granted to calling code, so we
                 // must mark this block as privileged too
-                unsafe = AccessController.doPrivileged(new PrivilegedAction<Object>() {
-                    @Override
-                    public Object run() {
-                        // force JCTools to initialize unsafe
-                        return UnsafeAccess.UNSAFE;
-                    }
+                unsafe = AccessController.doPrivileged((PrivilegedAction<Object>) () -> {
+                    // force JCTools to initialize unsafe
+                    return UnsafeAccess.UNSAFE;
                 });
             }
 
@@ -939,13 +860,13 @@ public final class PlatformDependent {
             // This is forced by the MpscChunkedArrayQueue implementation as will try to round it
             // up to the next power of two and so will overflow otherwise.
             final int capacity = max(min(maxCapacity, MAX_ALLOWED_MPSC_CAPACITY), MIN_MAX_MPSC_CAPACITY);
-            return USE_MPSC_CHUNKED_ARRAY_QUEUE ? new MpscChunkedArrayQueue<T>(MPSC_CHUNK_SIZE, capacity)
-                                                : new MpscChunkedAtomicArrayQueue<T>(MPSC_CHUNK_SIZE, capacity);
+            return USE_MPSC_CHUNKED_ARRAY_QUEUE ? new MpscChunkedArrayQueue<>(MPSC_CHUNK_SIZE, capacity)
+                                                : new MpscChunkedAtomicArrayQueue<>(MPSC_CHUNK_SIZE, capacity);
         }
 
         static <T> Queue<T> newMpscQueue() {
-            return USE_MPSC_CHUNKED_ARRAY_QUEUE ? new MpscUnboundedArrayQueue<T>(MPSC_CHUNK_SIZE)
-                                                : new MpscUnboundedAtomicArrayQueue<T>(MPSC_CHUNK_SIZE);
+            return USE_MPSC_CHUNKED_ARRAY_QUEUE ? new MpscUnboundedArrayQueue<>(MPSC_CHUNK_SIZE)
+                                                : new MpscUnboundedAtomicArrayQueue<>(MPSC_CHUNK_SIZE);
         }
     }
 
@@ -971,7 +892,7 @@ public final class PlatformDependent {
      * consumer (one thread!).
      */
     public static <T> Queue<T> newSpscQueue() {
-        return hasUnsafe() ? new SpscLinkedQueue<T>() : new SpscLinkedAtomicQueue<T>();
+        return hasUnsafe() ? new SpscLinkedQueue<>() : new SpscLinkedAtomicQueue<>();
     }
 
     /**
@@ -979,7 +900,7 @@ public final class PlatformDependent {
      * consumer (one thread!) with the given fixes {@code capacity}.
      */
     public static <T> Queue<T> newFixedMpscQueue(int capacity) {
-        return hasUnsafe() ? new MpscArrayQueue<T>(capacity) : new MpscAtomicArrayQueue<T>(capacity);
+        return hasUnsafe() ? new MpscArrayQueue<>(capacity) : new MpscAtomicArrayQueue<>(capacity);
     }
 
     /**
@@ -1006,20 +927,8 @@ public final class PlatformDependent {
     /**
      * Returns a new concurrent {@link Deque}.
      */
-    @SuppressJava6Requirement(reason = "Usage guarded by java version check")
     public static <C> Deque<C> newConcurrentDeque() {
-        if (javaVersion() < 7) {
-            return new LinkedBlockingDeque<C>();
-        } else {
-            return new ConcurrentLinkedDeque<C>();
-        }
-    }
-
-    /**
-     * Return a {@link Random} which is not-threadsafe and so can only be used from the same thread.
-     */
-    public static Random threadLocalRandom() {
-        return RANDOM_PROVIDER.current();
+        return new ConcurrentLinkedDeque<>();
     }
 
     private static boolean isWindows0() {
@@ -1484,34 +1393,6 @@ public final class PlatformDependent {
         }
 
         return "unknown";
-    }
-
-    private static final class AtomicLongCounter extends AtomicLong implements LongCounter {
-        private static final long serialVersionUID = 4074772784610639305L;
-
-        @Override
-        public void add(long delta) {
-            addAndGet(delta);
-        }
-
-        @Override
-        public void increment() {
-            incrementAndGet();
-        }
-
-        @Override
-        public void decrement() {
-            decrementAndGet();
-        }
-
-        @Override
-        public long value() {
-            return get();
-        }
-    }
-
-    private interface ThreadLocalRandomProvider {
-        Random current();
     }
 
     private PlatformDependent() {

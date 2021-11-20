@@ -17,15 +17,13 @@ package io.netty.bootstrap;
 
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandler;
-import io.netty.channel.ChannelHandlerAdapter;
 import io.netty.channel.ChannelHandlerContext;
-import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.channel.ChannelInitializer;
-import io.netty.channel.DefaultEventLoopGroup;
+import io.netty.channel.MultithreadEventLoopGroup;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.local.LocalAddress;
 import io.netty.channel.local.LocalChannel;
-import io.netty.channel.local.LocalEventLoopGroup;
+import io.netty.channel.local.LocalHandler;
 import io.netty.channel.local.LocalServerChannel;
 import org.junit.Test;
 
@@ -41,14 +39,14 @@ public class ServerBootstrapTest {
     @Test(timeout = 5000)
     public void testHandlerRegister() throws Exception {
         final CountDownLatch latch = new CountDownLatch(1);
-        final AtomicReference<Throwable> error = new AtomicReference<Throwable>();
-        LocalEventLoopGroup group = new LocalEventLoopGroup(1);
+        final AtomicReference<Throwable> error = new AtomicReference<>();
+        EventLoopGroup group = new MultithreadEventLoopGroup(1, LocalHandler.newFactory());
         try {
             ServerBootstrap sb = new ServerBootstrap();
             sb.channel(LocalServerChannel.class)
               .group(group)
-              .childHandler(new ChannelInboundHandlerAdapter())
-              .handler(new ChannelHandlerAdapter() {
+              .childHandler(new ChannelHandler() { })
+              .handler(new ChannelHandler() {
                   @Override
                   public void handlerAdded(ChannelHandlerContext ctx) throws Exception {
                       try {
@@ -83,28 +81,28 @@ public class ServerBootstrapTest {
         final CountDownLatch readLatch = new CountDownLatch(1);
         final CountDownLatch initLatch = new CountDownLatch(1);
 
-        final ChannelHandler handler = new ChannelInboundHandlerAdapter() {
+        final ChannelHandler handler = new ChannelHandler() {
             @Override
             public void handlerAdded(ChannelHandlerContext ctx) throws Exception {
                 initLatch.countDown();
-                super.handlerAdded(ctx);
+                ctx.fireChannelActive();
             }
 
             @Override
             public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
                 readLatch.countDown();
-                super.channelRead(ctx, msg);
+                ctx.fireChannelRead(msg);
             }
         };
 
-        EventLoopGroup group = new DefaultEventLoopGroup(1);
+        EventLoopGroup group = new MultithreadEventLoopGroup(1, LocalHandler.newFactory());
         Channel sch = null;
         Channel cch = null;
         try {
             ServerBootstrap sb = new ServerBootstrap();
             sb.channel(LocalServerChannel.class)
                     .group(group)
-                    .childHandler(new ChannelInboundHandlerAdapter());
+                    .childHandler(new ChannelHandler() { });
             if (channelInitializer) {
                 sb.handler(new ChannelInitializer<Channel>() {
                     @Override
@@ -119,7 +117,7 @@ public class ServerBootstrapTest {
             Bootstrap cb = new Bootstrap();
             cb.group(group)
                     .channel(LocalChannel.class)
-                    .handler(new ChannelInboundHandlerAdapter());
+                    .handler(new ChannelHandler() { });
 
             sch = sb.bind(addr).syncUninterruptibly().channel();
 

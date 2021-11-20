@@ -96,7 +96,7 @@ public class SocketCancelWriteTest extends AbstractSocketTest {
 
     private static class TestHandler extends SimpleChannelInboundHandler<ByteBuf> {
         volatile Channel channel;
-        final AtomicReference<Throwable> exception = new AtomicReference<Throwable>();
+        final AtomicReference<Throwable> exception = new AtomicReference<>();
         volatile int counter;
         final ByteBuf received = Unpooled.buffer();
         @Override
@@ -106,7 +106,7 @@ public class SocketCancelWriteTest extends AbstractSocketTest {
         }
 
         @Override
-        public void channelRead0(ChannelHandlerContext ctx, ByteBuf in) throws Exception {
+        public void messageReceived(ChannelHandlerContext ctx, ByteBuf in) throws Exception {
             counter += in.readableBytes();
             received.writeBytes(in);
         }

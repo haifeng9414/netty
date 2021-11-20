@@ -20,7 +20,6 @@ import io.netty.buffer.ByteBufInputStream;
 import io.netty.buffer.ByteBufUtil;
 import io.netty.buffer.Unpooled;
 import io.netty.util.CharsetUtil;
-import io.netty.util.internal.PlatformDependent;
 
 import org.junit.Test;
 
@@ -30,6 +29,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.UUID;
+import java.util.concurrent.ThreadLocalRandom;
 
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
@@ -114,7 +114,7 @@ public class DiskFileUploadTest {
         DiskFileUpload f1 = new DiskFileUpload("file1", "file1", "application/json", null, null, 0);
         try {
             byte[] jsonBytes = new byte[4096];
-            PlatformDependent.threadLocalRandom().nextBytes(jsonBytes);
+            ThreadLocalRandom.current().nextBytes(jsonBytes);
 
             f1.addContent(Unpooled.wrappedBuffer(jsonBytes, 0, 1024), false);
             f1.addContent(Unpooled.wrappedBuffer(jsonBytes, 1024, jsonBytes.length - 1024), true);
@@ -200,7 +200,7 @@ public class DiskFileUploadTest {
         DiskFileUpload f1 = new DiskFileUpload("file3", "file3", "application/json", null, null, 0);
         try {
             byte[] bytes = new byte[4096];
-            PlatformDependent.threadLocalRandom().nextBytes(bytes);
+            ThreadLocalRandom.current().nextBytes(bytes);
 
             final ByteBuf buffer;
 
@@ -272,7 +272,7 @@ public class DiskFileUploadTest {
             assertEquals(maxSize, originalFile.length());
             assertEquals(maxSize, f1.length());
             byte[] bytes = new byte[8];
-            PlatformDependent.threadLocalRandom().nextBytes(bytes);
+            ThreadLocalRandom.current().nextBytes(bytes);
             File tmpFile = File.createTempFile(UUID.randomUUID().toString(), ".tmp");
             tmpFile.deleteOnExit();
             FileOutputStream fos = new FileOutputStream(tmpFile);

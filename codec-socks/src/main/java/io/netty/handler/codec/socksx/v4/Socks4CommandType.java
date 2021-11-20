@@ -15,7 +15,7 @@
  */
 package io.netty.handler.codec.socksx.v4;
 
-import io.netty.util.internal.ObjectUtil;
+import static java.util.Objects.requireNonNull;
 
 /**
  * The type of {@link Socks4CommandRequest}.
@@ -45,8 +45,9 @@ public class Socks4CommandType implements Comparable<Socks4CommandType> {
     }
 
     public Socks4CommandType(int byteValue, String name) {
-        this.name = ObjectUtil.checkNotNull(name, "name");
+        requireNonNull(name, "name");
         this.byteValue = (byte) byteValue;
+        this.name = name;
     }
 
     public byte byteValue() {

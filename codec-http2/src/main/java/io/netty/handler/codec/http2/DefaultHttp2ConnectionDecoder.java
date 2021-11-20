@@ -22,8 +22,6 @@ import io.netty.util.internal.UnstableApi;
 import io.netty.util.internal.logging.InternalLogger;
 import io.netty.util.internal.logging.InternalLoggerFactory;
 
-import java.util.List;
-
 import static io.netty.handler.codec.http.HttpStatusClass.INFORMATIONAL;
 import static io.netty.handler.codec.http2.Http2CodecUtil.DEFAULT_PRIORITY_WEIGHT;
 import static io.netty.handler.codec.http2.Http2Error.INTERNAL_ERROR;
@@ -34,9 +32,9 @@ import static io.netty.handler.codec.http2.Http2Exception.streamError;
 import static io.netty.handler.codec.http2.Http2PromisedRequestVerifier.ALWAYS_VERIFY;
 import static io.netty.handler.codec.http2.Http2Stream.State.CLOSED;
 import static io.netty.handler.codec.http2.Http2Stream.State.HALF_CLOSED_REMOTE;
-import static io.netty.util.internal.ObjectUtil.checkNotNull;
 import static java.lang.Integer.MAX_VALUE;
 import static java.lang.Math.min;
+import static java.util.Objects.requireNonNull;
 
 /**
  * Provides the default implementation for processing inbound frame events and delegates to a
@@ -124,10 +122,10 @@ public class DefaultHttp2ConnectionDecoder implements Http2ConnectionDecoder {
             }
             settingsReceivedConsumer = (Http2SettingsReceivedConsumer) encoder;
         }
-        this.connection = checkNotNull(connection, "connection");
-        this.frameReader = checkNotNull(frameReader, "frameReader");
-        this.encoder = checkNotNull(encoder, "encoder");
-        this.requestVerifier = checkNotNull(requestVerifier, "requestVerifier");
+        this.connection = requireNonNull(connection, "connection");
+        this.frameReader = requireNonNull(frameReader, "frameReader");
+        this.encoder = requireNonNull(encoder, "encoder");
+        this.requestVerifier = requireNonNull(requestVerifier, "requestVerifier");
         if (connection.local().flowController() == null) {
             connection.local().flowController(new DefaultHttp2LocalFlowController(connection));
         }
@@ -136,7 +134,7 @@ public class DefaultHttp2ConnectionDecoder implements Http2ConnectionDecoder {
 
     @Override
     public void lifecycleManager(Http2LifecycleManager lifecycleManager) {
-        this.lifecycleManager = checkNotNull(lifecycleManager, "lifecycleManager");
+        this.lifecycleManager = requireNonNull(lifecycleManager, "lifecycleManager");
     }
 
     @Override
@@ -151,7 +149,7 @@ public class DefaultHttp2ConnectionDecoder implements Http2ConnectionDecoder {
 
     @Override
     public void frameListener(Http2FrameListener listener) {
-        this.listener = checkNotNull(listener, "listener");
+        this.listener = requireNonNull(listener, "listener");
     }
 
     @Override
@@ -170,7 +168,7 @@ public class DefaultHttp2ConnectionDecoder implements Http2ConnectionDecoder {
     }
 
     @Override
-    public void decodeFrame(ChannelHandlerContext ctx, ByteBuf in, List<Object> out) throws Http2Exception {
+    public void decodeFrame(ChannelHandlerContext ctx, ByteBuf in) throws Http2Exception {
         frameReader.readFrame(ctx, in, internalFrameListener);
     }
 
@@ -291,14 +289,7 @@ public class DefaultHttp2ConnectionDecoder implements Http2ConnectionDecoder {
                 // immediately processed.
                 bytesToReturn = listener.onDataRead(ctx, streamId, data, padding, endOfStream);
                 return bytesToReturn;
-            } catch (Http2Exception e) {
-                // If an exception happened during delivery, the listener may have returned part
-                // of the bytes before the error occurred. If that's the case, subtract that from
-                // the total processed bytes so that we don't return too many bytes.
-                int delta = unconsumedBytes - unconsumedBytes(stream);
-                bytesToReturn -= delta;
-                throw e;
-            } catch (RuntimeException e) {
+            } catch (Http2Exception | RuntimeException e) {
                 // If an exception happened during delivery, the listener may have returned part
                 // of the bytes before the error occurred. If that's the case, subtract that from
                 // the total processed bytes so that we don't return too many bytes.

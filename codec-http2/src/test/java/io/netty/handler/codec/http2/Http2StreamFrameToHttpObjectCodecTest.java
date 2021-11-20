@@ -21,7 +21,6 @@ import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
-import io.netty.channel.ChannelOutboundHandlerAdapter;
 import io.netty.channel.ChannelPromise;
 import io.netty.channel.embedded.EmbeddedChannel;
 import io.netty.handler.codec.EncoderException;
@@ -446,11 +445,11 @@ public class Http2StreamFrameToHttpObjectCodecTest {
 
     @Test
     public void testEncodeHttpsSchemeWhenSslHandlerExists() throws Exception {
-        final Queue<Http2StreamFrame> frames = new ConcurrentLinkedQueue<Http2StreamFrame>();
+        final Queue<Http2StreamFrame> frames = new ConcurrentLinkedQueue<>();
 
         final SslContext ctx = SslContextBuilder.forClient().sslProvider(SslProvider.JDK).build();
         EmbeddedChannel ch = new EmbeddedChannel(ctx.newHandler(ByteBufAllocator.DEFAULT),
-                new ChannelOutboundHandlerAdapter() {
+                new ChannelHandler() {
                     @Override
                     public void write(ChannelHandlerContext ctx, Object msg, ChannelPromise promise) throws Exception {
                         if (msg instanceof Http2StreamFrame) {
@@ -875,12 +874,12 @@ public class Http2StreamFrameToHttpObjectCodecTest {
 
     @Test
     public void testIsSharableBetweenChannels() throws Exception {
-        final Queue<Http2StreamFrame> frames = new ConcurrentLinkedQueue<Http2StreamFrame>();
+        final Queue<Http2StreamFrame> frames = new ConcurrentLinkedQueue<>();
         final ChannelHandler sharedHandler = new Http2StreamFrameToHttpObjectCodec(false);
 
         final SslContext ctx = SslContextBuilder.forClient().sslProvider(SslProvider.JDK).build();
         EmbeddedChannel tlsCh = new EmbeddedChannel(ctx.newHandler(ByteBufAllocator.DEFAULT),
-            new ChannelOutboundHandlerAdapter() {
+            new ChannelHandler() {
                 @Override
                 public void write(ChannelHandlerContext ctx, Object msg, ChannelPromise promise) {
                     if (msg instanceof Http2StreamFrame) {
@@ -893,7 +892,7 @@ public class Http2StreamFrameToHttpObjectCodecTest {
             }, sharedHandler);
 
         EmbeddedChannel plaintextCh = new EmbeddedChannel(
-            new ChannelOutboundHandlerAdapter() {
+            new ChannelHandler() {
                 @Override
                 public void write(ChannelHandlerContext ctx, Object msg, ChannelPromise promise) {
                     if (msg instanceof Http2StreamFrame) {

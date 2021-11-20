@@ -17,13 +17,10 @@ package io.netty.handler.logging;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufHolder;
-import io.netty.channel.ChannelDuplexHandler;
 import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandler.Sharable;
 import io.netty.channel.ChannelHandlerContext;
-import io.netty.channel.ChannelOutboundHandler;
 import io.netty.channel.ChannelPromise;
-import io.netty.util.internal.ObjectUtil;
 import io.netty.util.internal.logging.InternalLogLevel;
 import io.netty.util.internal.logging.InternalLogger;
 import io.netty.util.internal.logging.InternalLoggerFactory;
@@ -32,6 +29,7 @@ import java.net.SocketAddress;
 
 import static io.netty.buffer.ByteBufUtil.appendPrettyHexDump;
 import static io.netty.util.internal.StringUtil.NEWLINE;
+import static java.util.Objects.requireNonNull;
 
 /**
  * A {@link ChannelHandler} that logs all events using a logging framework.
@@ -39,7 +37,7 @@ import static io.netty.util.internal.StringUtil.NEWLINE;
  */
 @Sharable
 @SuppressWarnings({ "StringConcatenationInsideStringBufferAppend", "StringBufferReplaceableByString" })
-public class LoggingHandler extends ChannelDuplexHandler {
+public class LoggingHandler implements ChannelHandler {
 
     private static final LogLevel DEFAULT_LEVEL = LogLevel.DEBUG;
 
@@ -75,8 +73,8 @@ public class LoggingHandler extends ChannelDuplexHandler {
      * @param byteBufFormat the ByteBuf format
      */
     public LoggingHandler(LogLevel level, ByteBufFormat byteBufFormat) {
-        this.level = ObjectUtil.checkNotNull(level, "level");
-        this.byteBufFormat = ObjectUtil.checkNotNull(byteBufFormat, "byteBufFormat");
+        this.level = requireNonNull(level, "level");
+        this.byteBufFormat = requireNonNull(byteBufFormat, "byteBufFormat");
         logger = InternalLoggerFactory.getInstance(getClass());
         internalLevel = level.toInternalLevel();
     }
@@ -109,9 +107,9 @@ public class LoggingHandler extends ChannelDuplexHandler {
      * @param byteBufFormat the ByteBuf format
      */
     public LoggingHandler(Class<?> clazz, LogLevel level, ByteBufFormat byteBufFormat) {
-        ObjectUtil.checkNotNull(clazz, "clazz");
-        this.level = ObjectUtil.checkNotNull(level, "level");
-        this.byteBufFormat = ObjectUtil.checkNotNull(byteBufFormat, "byteBufFormat");
+        requireNonNull(clazz, "clazz");
+        this.level = requireNonNull(level, "level");
+        this.byteBufFormat = requireNonNull(byteBufFormat, "byteBufFormat");
         logger = InternalLoggerFactory.getInstance(clazz);
         internalLevel = level.toInternalLevel();
     }
@@ -143,10 +141,10 @@ public class LoggingHandler extends ChannelDuplexHandler {
      * @param byteBufFormat the ByteBuf format
      */
     public LoggingHandler(String name, LogLevel level, ByteBufFormat byteBufFormat) {
-        ObjectUtil.checkNotNull(name, "name");
+        requireNonNull(name, "name");
 
-        this.level = ObjectUtil.checkNotNull(level, "level");
-        this.byteBufFormat = ObjectUtil.checkNotNull(byteBufFormat, "byteBufFormat");
+        this.level = requireNonNull(level, "level");
+        this.byteBufFormat = requireNonNull(byteBufFormat, "byteBufFormat");
         logger = InternalLoggerFactory.getInstance(name);
         internalLevel = level.toInternalLevel();
     }
@@ -327,7 +325,7 @@ public class LoggingHandler extends ChannelDuplexHandler {
 
     /**
      * Formats an event and returns the formatted message.  This method is currently only used for formatting
-     * {@link ChannelOutboundHandler#connect(ChannelHandlerContext, SocketAddress, SocketAddress, ChannelPromise)}.
+     * {@link ChannelHandler#connect(ChannelHandlerContext, SocketAddress, SocketAddress, ChannelPromise)}.
      *
      * @param eventName the name of the event
      * @param firstArg  the first argument of the event

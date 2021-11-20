@@ -26,7 +26,7 @@ import java.nio.channels.UnsupportedAddressTypeException;
 import java.util.Collections;
 import java.util.List;
 
-import static io.netty.util.internal.ObjectUtil.checkNotNull;
+import static java.util.Objects.requireNonNull;
 
 /**
  * A skeletal {@link AddressResolver} implementation.
@@ -41,8 +41,8 @@ public abstract class AbstractAddressResolver<T extends SocketAddress> implement
      *                 by {@link #resolve(SocketAddress)}
      */
     protected AbstractAddressResolver(EventExecutor executor) {
-        this.executor = checkNotNull(executor, "executor");
-        this.matcher = TypeParameterMatcher.find(this, AbstractAddressResolver.class, "T");
+        this.executor = requireNonNull(executor, "executor");
+        matcher = TypeParameterMatcher.find(this, AbstractAddressResolver.class, "T");
     }
 
     /**
@@ -51,8 +51,8 @@ public abstract class AbstractAddressResolver<T extends SocketAddress> implement
      * @param addressType the type of the {@link SocketAddress} supported by this resolver
      */
     protected AbstractAddressResolver(EventExecutor executor, Class<? extends T> addressType) {
-        this.executor = checkNotNull(executor, "executor");
-        this.matcher = TypeParameterMatcher.get(addressType);
+        this.executor = requireNonNull(executor, "executor");
+        matcher = TypeParameterMatcher.get(addressType);
     }
 
     /**
@@ -87,7 +87,7 @@ public abstract class AbstractAddressResolver<T extends SocketAddress> implement
 
     @Override
     public final Future<T> resolve(SocketAddress address) {
-        if (!isSupported(checkNotNull(address, "address"))) {
+        if (!isSupported(requireNonNull(address, "address"))) {
             // Address type not supported by the resolver
             return executor().newFailedFuture(new UnsupportedAddressTypeException());
         }
@@ -112,8 +112,8 @@ public abstract class AbstractAddressResolver<T extends SocketAddress> implement
 
     @Override
     public final Future<T> resolve(SocketAddress address, Promise<T> promise) {
-        checkNotNull(address, "address");
-        checkNotNull(promise, "promise");
+        requireNonNull(address, "address");
+        requireNonNull(promise, "promise");
 
         if (!isSupported(address)) {
             // Address type not supported by the resolver
@@ -139,7 +139,7 @@ public abstract class AbstractAddressResolver<T extends SocketAddress> implement
 
     @Override
     public final Future<List<T>> resolveAll(SocketAddress address) {
-        if (!isSupported(checkNotNull(address, "address"))) {
+        if (!isSupported(requireNonNull(address, "address"))) {
             // Address type not supported by the resolver
             return executor().newFailedFuture(new UnsupportedAddressTypeException());
         }
@@ -164,8 +164,8 @@ public abstract class AbstractAddressResolver<T extends SocketAddress> implement
 
     @Override
     public final Future<List<T>> resolveAll(SocketAddress address, Promise<List<T>> promise) {
-        checkNotNull(address, "address");
-        checkNotNull(promise, "promise");
+        requireNonNull(address, "address");
+        requireNonNull(promise, "promise");
 
         if (!isSupported(address)) {
             // Address type not supported by the resolver

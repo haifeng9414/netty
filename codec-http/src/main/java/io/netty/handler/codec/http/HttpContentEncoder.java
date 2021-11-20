@@ -15,6 +15,8 @@
  */
 package io.netty.handler.codec.http;
 
+import static java.util.Objects.requireNonNull;
+
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufHolder;
 import io.netty.channel.ChannelHandlerContext;
@@ -22,7 +24,6 @@ import io.netty.channel.embedded.EmbeddedChannel;
 import io.netty.handler.codec.DecoderResult;
 import io.netty.handler.codec.MessageToMessageCodec;
 import io.netty.util.ReferenceCountUtil;
-import io.netty.util.internal.ObjectUtil;
 import io.netty.util.internal.StringUtil;
 
 import java.util.ArrayDeque;
@@ -65,7 +66,7 @@ public abstract class HttpContentEncoder extends MessageToMessageCodec<HttpReque
     private static final CharSequence ZERO_LENGTH_CONNECT = "CONNECT";
     private static final int CONTINUE_CODE = HttpResponseStatus.CONTINUE.code();
 
-    private final Queue<CharSequence> acceptEncodingQueue = new ArrayDeque<CharSequence>();
+    private final Queue<CharSequence> acceptEncodingQueue = new ArrayDeque<>();
     private EmbeddedChannel encoder;
     private State state = State.AWAIT_HEADERS;
 
@@ -75,7 +76,7 @@ public abstract class HttpContentEncoder extends MessageToMessageCodec<HttpReque
     }
 
     @Override
-    protected void decode(ChannelHandlerContext ctx, HttpRequest msg, List<Object> out) throws Exception {
+    protected void decode(ChannelHandlerContext ctx, HttpRequest msg) throws Exception {
         CharSequence acceptEncoding;
         List<String> acceptEncodingHeaders = msg.headers().getAll(ACCEPT_ENCODING);
         switch (acceptEncodingHeaders.size()) {
@@ -99,7 +100,7 @@ public abstract class HttpContentEncoder extends MessageToMessageCodec<HttpReque
         }
 
         acceptEncodingQueue.add(acceptEncoding);
-        out.add(ReferenceCountUtil.retain(msg));
+        ctx.fireChannelRead(ReferenceCountUtil.retain(msg));
     }
 
     @Override
@@ -363,8 +364,11 @@ public abstract class HttpContentEncoder extends MessageToMessageCodec<HttpReque
         private final EmbeddedChannel contentEncoder;
 
         public Result(String targetContentEncoding, EmbeddedChannel contentEncoder) {
-            this.targetContentEncoding = ObjectUtil.checkNotNull(targetContentEncoding, "targetContentEncoding");
-            this.contentEncoder = ObjectUtil.checkNotNull(contentEncoder, "contentEncoder");
+            requireNonNull(targetContentEncoding, "targetContentEncoding");
+            requireNonNull(contentEncoder, "contentEncoder");
+
+            this.targetContentEncoding = targetContentEncoding;
+            this.contentEncoder = contentEncoder;
         }
 
         public String targetContentEncoding() {

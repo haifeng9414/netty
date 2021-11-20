@@ -23,7 +23,6 @@ import io.netty.channel.MessageSizeEstimator;
 import io.netty.channel.RecvByteBufAllocator;
 import io.netty.channel.WriteBufferWaterMark;
 import io.netty.util.NetUtil;
-import io.netty.util.internal.ObjectUtil;
 
 import java.net.ServerSocket;
 import java.net.SocketException;
@@ -33,6 +32,7 @@ import static io.netty.channel.ChannelOption.SO_BACKLOG;
 import static io.netty.channel.ChannelOption.SO_RCVBUF;
 import static io.netty.channel.ChannelOption.SO_REUSEADDR;
 import static io.netty.util.internal.ObjectUtil.checkPositiveOrZero;
+import static java.util.Objects.requireNonNull;
 
 /**
  * The default {@link ServerSocketChannelConfig} implementation.
@@ -48,7 +48,8 @@ public class DefaultServerSocketChannelConfig extends DefaultChannelConfig
      */
     public DefaultServerSocketChannelConfig(ServerSocketChannel channel, ServerSocket javaSocket) {
         super(channel);
-        this.javaSocket = ObjectUtil.checkNotNull(javaSocket, "javaSocket");
+        requireNonNull(javaSocket, "javaSocket");
+        this.javaSocket = javaSocket;
     }
 
     @Override

@@ -163,7 +163,7 @@ public final class NetUtil {
         LOCALHOST6 = localhost6;
 
         // Retrieve the list of available network interfaces.
-        List<NetworkInterface> ifaces = new ArrayList<NetworkInterface>();
+        List<NetworkInterface> ifaces = new ArrayList<>();
         try {
             Enumeration<NetworkInterface> interfaces = NetworkInterface.getNetworkInterfaces();
             if (interfaces != null) {
@@ -250,62 +250,59 @@ public final class NetUtil {
         // As a SecurityManager may prevent reading the somaxconn file we wrap this in a privileged block.
         //
         // See https://github.com/netty/netty/issues/3680
-        SOMAXCONN = AccessController.doPrivileged(new PrivilegedAction<Integer>() {
-            @Override
-            public Integer run() {
-                // Determine the default somaxconn (server socket backlog) value of the platform.
-                // The known defaults:
-                // - Windows NT Server 4.0+: 200
-                // - Linux and Mac OS X: 128
-                int somaxconn = PlatformDependent.isWindows() ? 200 : 128;
-                File file = new File("/proc/sys/net/core/somaxconn");
-                BufferedReader in = null;
-                try {
-                    // file.exists() may throw a SecurityException if a SecurityManager is used, so execute it in the
-                    // try / catch block.
-                    // See https://github.com/netty/netty/issues/4936
-                    if (file.exists()) {
-                        in = new BufferedReader(new FileReader(file));
-                        somaxconn = Integer.parseInt(in.readLine());
-                        if (logger.isDebugEnabled()) {
-                            logger.debug("{}: {}", file, somaxconn);
-                        }
-                    } else {
-                        // Try to get from sysctl
-                        Integer tmp = null;
-                        if (SystemPropertyUtil.getBoolean("io.netty.net.somaxconn.trySysctl", false)) {
-                            tmp = sysctlGetInt("kern.ipc.somaxconn");
-                            if (tmp == null) {
-                                tmp = sysctlGetInt("kern.ipc.soacceptqueue");
-                                if (tmp != null) {
-                                    somaxconn = tmp;
-                                }
-                            } else {
+        SOMAXCONN = AccessController.doPrivileged((PrivilegedAction<Integer>) () -> {
+            // Determine the default somaxconn (server socket backlog) value of the platform.
+            // The known defaults:
+            // - Windows NT Server 4.0+: 200
+            // - Linux and Mac OS X: 128
+            int somaxconn = PlatformDependent.isWindows() ? 200 : 128;
+            File file = new File("/proc/sys/net/core/somaxconn");
+            BufferedReader in = null;
+            try {
+                // file.exists() may throw a SecurityException if a SecurityManager is used, so execute it in the
+                // try / catch block.
+                // See https://github.com/netty/netty/issues/4936
+                if (file.exists()) {
+                    in = new BufferedReader(new FileReader(file));
+                    somaxconn = Integer.parseInt(in.readLine());
+                    if (logger.isDebugEnabled()) {
+                        logger.debug("{}: {}", file, somaxconn);
+                    }
+                } else {
+                    // Try to get from sysctl
+                    Integer tmp = null;
+                    if (SystemPropertyUtil.getBoolean("io.netty.net.somaxconn.trySysctl", false)) {
+                        tmp = sysctlGetInt("kern.ipc.somaxconn");
+                        if (tmp == null) {
+                            tmp = sysctlGetInt("kern.ipc.soacceptqueue");
+                            if (tmp != null) {
                                 somaxconn = tmp;
                             }
+                        } else {
+                            somaxconn = tmp;
                         }
+                    }
 
-                        if (tmp == null) {
-                            logger.debug("Failed to get SOMAXCONN from sysctl and file {}. Default: {}", file,
-                                         somaxconn);
-                        }
-                    }
-                } catch (Exception e) {
-                    if (logger.isDebugEnabled()) {
-                        logger.debug("Failed to get SOMAXCONN from sysctl and file {}. Default: {}",
-                                file, somaxconn, e);
-                    }
-                } finally {
-                    if (in != null) {
-                        try {
-                            in.close();
-                        } catch (Exception e) {
-                            // Ignored.
-                        }
+                    if (tmp == null) {
+                        logger.debug("Failed to get SOMAXCONN from sysctl and file {}. Default: {}", file,
+                                     somaxconn);
                     }
                 }
-                return somaxconn;
+            } catch (Exception e) {
+                if (logger.isDebugEnabled()) {
+                    logger.debug("Failed to get SOMAXCONN from sysctl and file {}. Default: {}",
+                            file, somaxconn, e);
+                }
+            } finally {
+                if (in != null) {
+                    try {
+                        in.close();
+                    } catch (Exception e) {
+                        // Ignored.
+                    }
+                }
             }
+            return somaxconn;
         });
     }
 
@@ -320,8 +317,7 @@ public final class NetUtil {
         try {
             InputStream is = process.getInputStream();
             InputStreamReader isr = new InputStreamReader(is);
-            BufferedReader br = new BufferedReader(isr);
-            try {
+            try (BufferedReader br = new BufferedReader(isr)) {
                 String line = br.readLine();
                 if (line != null && line.startsWith(sysctlKey)) {
                     for (int i = line.length() - 1; i > sysctlKey.length(); --i) {
@@ -331,13 +327,9 @@ public final class NetUtil {
                     }
                 }
                 return null;
-            } finally {
-                br.close();
             }
         } finally {
-            if (process != null) {
-                process.destroy();
-            }
+            process.destroy();
         }
     }
 
@@ -1134,7 +1126,7 @@ public final class NetUtil {
      * @return the host string
      */
     public static String getHostname(InetSocketAddress addr) {
-        return PlatformDependent.javaVersion() >= 7 ? addr.getHostString() : addr.getHostName();
+        return addr.getHostString();
     }
 
     /**

@@ -18,8 +18,6 @@ package io.netty.handler.ssl;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufUtil;
 import io.netty.channel.ChannelHandlerContext;
-import io.netty.channel.ChannelOutboundHandler;
-import io.netty.channel.ChannelPromise;
 import io.netty.handler.codec.ByteToMessageDecoder;
 import io.netty.handler.codec.DecoderException;
 import io.netty.util.concurrent.Future;
@@ -28,13 +26,10 @@ import io.netty.util.internal.PlatformDependent;
 import io.netty.util.internal.logging.InternalLogger;
 import io.netty.util.internal.logging.InternalLoggerFactory;
 
-import java.net.SocketAddress;
-import java.util.List;
-
 /**
  * {@link ByteToMessageDecoder} which allows to be notified once a full {@code ClientHello} was received.
  */
-public abstract class SslClientHelloHandler<T> extends ByteToMessageDecoder implements ChannelOutboundHandler {
+public abstract class SslClientHelloHandler<T> extends ByteToMessageDecoder {
 
     private static final InternalLogger logger =
             InternalLoggerFactory.getInstance(SslClientHelloHandler.class);
@@ -45,7 +40,7 @@ public abstract class SslClientHelloHandler<T> extends ByteToMessageDecoder impl
     private ByteBuf handshakeBuffer;
 
     @Override
-    protected void decode(ChannelHandlerContext ctx, ByteBuf in, List<Object> out) throws Exception {
+    protected void decode(ChannelHandlerContext ctx, ByteBuf in) throws Exception {
         if (!suppressRead && !handshakeFailed) {
             try {
                 int readerIndex = in.readerIndex();
@@ -68,7 +63,7 @@ public abstract class SslClientHelloHandler<T> extends ByteToMessageDecoder impl
                                         "not an SSL/TLS record: " + ByteBufUtil.hexDump(in));
                                 in.skipBytes(in.readableBytes());
                                 ctx.fireUserEventTriggered(new SniCompletionEvent(e));
-                                SslUtils.handleHandshakeFailure(ctx, e, true);
+                                ctx.fireUserEventTriggered(new SslHandshakeCompletionEvent(e));
                                 throw e;
                             }
                             if (len == SslUtils.NOT_ENOUGH_DATA) {
@@ -182,7 +177,7 @@ public abstract class SslClientHelloHandler<T> extends ByteToMessageDecoder impl
         }
     }
 
-    private void select(final ChannelHandlerContext ctx, ByteBuf clientHello) throws Exception {
+    private void select(final ChannelHandlerContext ctx, ByteBuf clientHello) {
         final Future<T> future;
         try {
             future = lookup(ctx, clientHello);
@@ -191,26 +186,23 @@ public abstract class SslClientHelloHandler<T> extends ByteToMessageDecoder impl
             } else {
                 suppressRead = true;
                 final ByteBuf finalClientHello = clientHello;
-                future.addListener(new FutureListener<T>() {
-                    @Override
-                    public void operationComplete(Future<T> future) {
-                        releaseIfNotNull(finalClientHello);
+                future.addListener((FutureListener<T>) f -> {
+                    releaseIfNotNull(finalClientHello);
+                    try {
+                        suppressRead = false;
                         try {
-                            suppressRead = false;
-                            try {
-                                onLookupComplete(ctx, future);
-                            } catch (DecoderException err) {
-                                ctx.fireExceptionCaught(err);
-                            } catch (Exception cause) {
-                                ctx.fireExceptionCaught(new DecoderException(cause));
-                            } catch (Throwable cause) {
-                                ctx.fireExceptionCaught(cause);
-                            }
-                        } finally {
-                            if (readPending) {
-                                readPending = false;
-                                ctx.read();
-                            }
+                            onLookupComplete(ctx, f);
+                        } catch (DecoderException err) {
+                            ctx.fireExceptionCaught(err);
+                        } catch (Exception cause) {
+                            ctx.fireExceptionCaught(new DecoderException(cause));
+                        } catch (Throwable cause) {
+                            ctx.fireExceptionCaught(cause);
+                        }
+                    } finally {
+                        if (readPending) {
+                            readPending = false;
+                            ctx.read();
                         }
                     }
                 });
@@ -272,41 +264,5 @@ public abstract class SslClientHelloHandler<T> extends ByteToMessageDecoder impl
         } else {
             ctx.read();
         }
-    }
-
-    @Override
-    public void bind(ChannelHandlerContext ctx, SocketAddress localAddress, ChannelPromise promise) throws Exception {
-        ctx.bind(localAddress, promise);
-    }
-
-    @Override
-    public void connect(ChannelHandlerContext ctx, SocketAddress remoteAddress, SocketAddress localAddress,
-                        ChannelPromise promise) throws Exception {
-        ctx.connect(remoteAddress, localAddress, promise);
-    }
-
-    @Override
-    public void disconnect(ChannelHandlerContext ctx, ChannelPromise promise) throws Exception {
-        ctx.disconnect(promise);
-    }
-
-    @Override
-    public void close(ChannelHandlerContext ctx, ChannelPromise promise) throws Exception {
-        ctx.close(promise);
-    }
-
-    @Override
-    public void deregister(ChannelHandlerContext ctx, ChannelPromise promise) throws Exception {
-        ctx.deregister(promise);
-    }
-
-    @Override
-    public void write(ChannelHandlerContext ctx, Object msg, ChannelPromise promise) throws Exception {
-        ctx.write(msg, promise);
-    }
-
-    @Override
-    public void flush(ChannelHandlerContext ctx) throws Exception {
-        ctx.flush();
     }
 }

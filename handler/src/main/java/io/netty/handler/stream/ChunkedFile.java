@@ -15,11 +15,12 @@
  */
 package io.netty.handler.stream;
 
+import static java.util.Objects.requireNonNull;
+
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.FileRegion;
-import io.netty.util.internal.ObjectUtil;
 
 import java.io.File;
 import java.io.IOException;
@@ -83,14 +84,24 @@ public class ChunkedFile implements ChunkedInput<ByteBuf> {
      *                  {@link #readChunk(ChannelHandlerContext)} call
      */
     public ChunkedFile(RandomAccessFile file, long offset, long length, int chunkSize) throws IOException {
-        ObjectUtil.checkNotNull(file, "file");
-        ObjectUtil.checkPositiveOrZero(offset, "offset");
-        ObjectUtil.checkPositiveOrZero(length, "length");
-        ObjectUtil.checkPositive(chunkSize, "chunkSize");
+        requireNonNull(file, "file");
+        if (offset < 0) {
+            throw new IllegalArgumentException(
+                    "offset: " + offset + " (expected: 0 or greater)");
+        }
+        if (length < 0) {
+            throw new IllegalArgumentException(
+                    "length: " + length + " (expected: 0 or greater)");
+        }
+        if (chunkSize <= 0) {
+            throw new IllegalArgumentException(
+                    "chunkSize: " + chunkSize +
+                    " (expected: a positive integer)");
+        }
 
         this.file = file;
         this.offset = startOffset = offset;
-        this.endOffset = offset + length;
+        endOffset = offset + length;
         this.chunkSize = chunkSize;
 
         file.seek(offset);

@@ -16,7 +16,6 @@ package io.netty.handler.codec.http2;
 
 import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
-import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.channel.embedded.EmbeddedChannel;
 import io.netty.handler.codec.http.DefaultFullHttpRequest;
 import io.netty.handler.codec.http.FullHttpRequest;
@@ -45,7 +44,7 @@ public class Http2ClientUpgradeCodecTest {
     @Test
     public void testUpgradeToHttp2MultiplexCodec() throws Exception {
         testUpgrade(Http2MultiplexCodecBuilder.forClient(new HttpInboundHandler())
-            .withUpgradeStreamHandler(new ChannelInboundHandlerAdapter()).build(), null);
+                .withUpgradeStreamHandler(new ChannelHandler() { }).build(), null);
     }
 
     @Test
@@ -58,7 +57,7 @@ public class Http2ClientUpgradeCodecTest {
             throws Exception {
         FullHttpRequest request = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.OPTIONS, "*");
 
-        EmbeddedChannel channel = new EmbeddedChannel(new ChannelInboundHandlerAdapter());
+        EmbeddedChannel channel = new EmbeddedChannel(new ChannelHandler() { });
         ChannelHandlerContext ctx = channel.pipeline().firstContext();
 
         Http2ClientUpgradeCodec codec;
@@ -84,5 +83,5 @@ public class Http2ClientUpgradeCodecTest {
     }
 
     @ChannelHandler.Sharable
-    private static final class HttpInboundHandler extends ChannelInboundHandlerAdapter { }
+    private static final class HttpInboundHandler implements ChannelHandler { }
 }

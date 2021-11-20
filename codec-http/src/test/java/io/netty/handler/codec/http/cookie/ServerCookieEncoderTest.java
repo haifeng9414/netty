@@ -72,7 +72,7 @@ public class ServerCookieEncoderTest {
 
     @Test
     public void testEncodingMultipleCookiesStrict() {
-        List<String> result = new ArrayList<String>();
+        List<String> result = new ArrayList<>();
         result.add("cookie2=value2");
         result.add("cookie1=value3");
         Cookie cookie1 = new DefaultCookie("cookie1", "value1");
@@ -84,7 +84,7 @@ public class ServerCookieEncoderTest {
 
     @Test
     public void illegalCharInCookieNameMakesStrictEncoderThrowsException() {
-        Set<Character> illegalChars = new HashSet<Character>();
+        Set<Character> illegalChars = new HashSet<>();
         // CTLs
         for (int i = 0x00; i <= 0x1F; i++) {
             illegalChars.add((char) i);
@@ -111,7 +111,7 @@ public class ServerCookieEncoderTest {
 
     @Test
     public void illegalCharInCookieValueMakesStrictEncoderThrowsException() {
-        Set<Character> illegalChars = new HashSet<Character>();
+        Set<Character> illegalChars = new HashSet<>();
         // CTLs
         for (int i = 0x00; i <= 0x1F; i++) {
             illegalChars.add((char) i);
@@ -146,7 +146,7 @@ public class ServerCookieEncoderTest {
 
     @Test
     public void testEncodingMultipleCookiesLax() {
-        List<String> result = new ArrayList<String>();
+        List<String> result = new ArrayList<>();
         result.add("cookie1=value1");
         result.add("cookie2=value2");
         result.add("cookie1=value3");

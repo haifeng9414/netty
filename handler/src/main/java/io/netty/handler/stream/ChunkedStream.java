@@ -15,10 +15,11 @@
  */
 package io.netty.handler.stream;
 
+import static java.util.Objects.requireNonNull;
+
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.channel.ChannelHandlerContext;
-import io.netty.util.internal.ObjectUtil;
 
 import java.io.InputStream;
 import java.io.PushbackInputStream;
@@ -56,8 +57,12 @@ public class ChunkedStream implements ChunkedInput<ByteBuf> {
      *                  {@link #readChunk(ChannelHandlerContext)} call
      */
     public ChunkedStream(InputStream in, int chunkSize) {
-        ObjectUtil.checkNotNull(in, "in");
-        ObjectUtil.checkPositive(chunkSize, "chunkSize");
+        requireNonNull(in, "in");
+        if (chunkSize <= 0) {
+            throw new IllegalArgumentException(
+                    "chunkSize: " + chunkSize +
+                    " (expected: a positive integer)");
+        }
 
         if (in instanceof PushbackInputStream) {
             this.in = (PushbackInputStream) in;

@@ -15,12 +15,12 @@
  */
 package io.netty.example.http.websocketx.server;
 
+import java.util.Locale;
+
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.handler.codec.http.websocketx.TextWebSocketFrame;
 import io.netty.handler.codec.http.websocketx.WebSocketFrame;
-
-import java.util.Locale;
 
 /**
  * Echoes uppercase content of text frames.
@@ -28,7 +28,7 @@ import java.util.Locale;
 public class WebSocketFrameHandler extends SimpleChannelInboundHandler<WebSocketFrame> {
 
     @Override
-    protected void channelRead0(ChannelHandlerContext ctx, WebSocketFrame frame) throws Exception {
+    protected void messageReceived(ChannelHandlerContext ctx, WebSocketFrame frame) throws Exception {
         // ping and pong frames already handled
 
         if (frame instanceof TextWebSocketFrame) {

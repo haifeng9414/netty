@@ -59,10 +59,10 @@ import static io.netty.util.AsciiString.indexOf;
 import static io.netty.util.AsciiString.trim;
 import static io.netty.util.ByteProcessor.FIND_COMMA;
 import static io.netty.util.ByteProcessor.FIND_SEMI_COLON;
-import static io.netty.util.internal.ObjectUtil.checkNotNull;
 import static io.netty.util.internal.StringUtil.isNullOrEmpty;
 import static io.netty.util.internal.StringUtil.length;
 import static io.netty.util.internal.StringUtil.unescapeCsvFields;
+import static java.util.Objects.requireNonNull;
 
 /**
  * Provides utility methods and constants for the HTTP/2 to HTTP conversion
@@ -73,7 +73,7 @@ public final class HttpConversionUtil {
      * The set of headers that should not be directly copied when converting headers from HTTP to HTTP/2.
      */
     private static final CharSequenceMap<AsciiString> HTTP_TO_HTTP2_HEADER_BLACKLIST =
-            new CharSequenceMap<AsciiString>();
+            new CharSequenceMap<>();
     static {
         HTTP_TO_HTTP2_HEADER_BLACKLIST.add(CONNECTION, EMPTY_STRING);
         @SuppressWarnings("deprecation")
@@ -248,9 +248,9 @@ public final class HttpConversionUtil {
                                                 boolean validateHttpHeaders)
                     throws Http2Exception {
         // HTTP/2 does not define a way to carry the version identifier that is included in the HTTP/1.1 request line.
-        final CharSequence method = checkNotNull(http2Headers.method(),
+        final CharSequence method = requireNonNull(http2Headers.method(),
                 "method header cannot be null in conversion to HTTP/1.x");
-        final CharSequence path = checkNotNull(http2Headers.path(),
+        final CharSequence path = requireNonNull(http2Headers.path(),
                 "path header cannot be null in conversion to HTTP/1.x");
         FullHttpRequest msg = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.valueOf(method
                         .toString()), path.toString(), alloc.buffer(), validateHttpHeaders);
@@ -281,9 +281,9 @@ public final class HttpConversionUtil {
     public static HttpRequest toHttpRequest(int streamId, Http2Headers http2Headers, boolean validateHttpHeaders)
                     throws Http2Exception {
         // HTTP/2 does not define a way to carry the version identifier that is included in the HTTP/1.1 request line.
-        final CharSequence method = checkNotNull(http2Headers.method(),
+        final CharSequence method = requireNonNull(http2Headers.method(),
                 "method header cannot be null in conversion to HTTP/1.x");
-        final CharSequence path = checkNotNull(http2Headers.path(),
+        final CharSequence path = requireNonNull(http2Headers.path(),
                 "path header cannot be null in conversion to HTTP/1.x");
         HttpRequest msg = new DefaultHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.valueOf(method.toString()),
                 path.toString(), validateHttpHeaders);
@@ -422,8 +422,8 @@ public final class HttpConversionUtil {
 
     private static CharSequenceMap<AsciiString> toLowercaseMap(Iterator<? extends CharSequence> valuesIter,
                                                                int arraySizeHint) {
-        UnsupportedValueConverter<AsciiString> valueConverter = UnsupportedValueConverter.<AsciiString>instance();
-        CharSequenceMap<AsciiString> result = new CharSequenceMap<AsciiString>(true, valueConverter, arraySizeHint);
+        UnsupportedValueConverter<AsciiString> valueConverter = UnsupportedValueConverter.instance();
+        CharSequenceMap<AsciiString> result = new CharSequenceMap<>(true, valueConverter, arraySizeHint);
 
         while (valuesIter.hasNext()) {
             AsciiString lowerCased = AsciiString.of(valuesIter.next()).toLowerCase();
@@ -589,9 +589,9 @@ public final class HttpConversionUtil {
          * Translations from HTTP/2 header name to the HTTP/1.x equivalent.
          */
         private static final CharSequenceMap<AsciiString>
-            REQUEST_HEADER_TRANSLATIONS = new CharSequenceMap<AsciiString>();
+            REQUEST_HEADER_TRANSLATIONS = new CharSequenceMap<>();
         private static final CharSequenceMap<AsciiString>
-            RESPONSE_HEADER_TRANSLATIONS = new CharSequenceMap<AsciiString>();
+            RESPONSE_HEADER_TRANSLATIONS = new CharSequenceMap<>();
         static {
             RESPONSE_HEADER_TRANSLATIONS.add(Http2Headers.PseudoHeaderName.AUTHORITY.value(),
                             HttpHeaderNames.HOST);

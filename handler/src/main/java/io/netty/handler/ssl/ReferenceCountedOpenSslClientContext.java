@@ -15,11 +15,10 @@
  */
 package io.netty.handler.ssl;
 
-import io.netty.internal.tcnative.CertificateCallback;
-import io.netty.util.internal.SuppressJava6Requirement;
 import io.netty.util.internal.SystemPropertyUtil;
 import io.netty.util.internal.logging.InternalLogger;
 import io.netty.util.internal.logging.InternalLoggerFactory;
+import io.netty.internal.tcnative.CertificateCallback;
 import io.netty.internal.tcnative.SSL;
 import io.netty.internal.tcnative.SSLContext;
 
@@ -51,7 +50,7 @@ import javax.security.auth.x500.X500Principal;
 public final class ReferenceCountedOpenSslClientContext extends ReferenceCountedOpenSslContext {
     private static final InternalLogger logger =
             InternalLoggerFactory.getInstance(ReferenceCountedOpenSslClientContext.class);
-    private static final Set<String> SUPPORTED_KEY_TYPES = Collections.unmodifiableSet(new LinkedHashSet<String>(
+    private static final Set<String> SUPPORTED_KEY_TYPES = Collections.unmodifiableSet(new LinkedHashSet<>(
             Arrays.asList(OpenSslKeyMaterialManager.KEY_TYPE_RSA,
                           OpenSslKeyMaterialManager.KEY_TYPE_DH_RSA,
                           OpenSslKeyMaterialManager.KEY_TYPE_EC,
@@ -100,7 +99,7 @@ public final class ReferenceCountedOpenSslClientContext extends ReferenceCounted
         OpenSslKeyMaterialProvider keyMaterialProvider = null;
         try {
             try {
-                if (!OpenSsl.useKeyManagerFactory()) {
+                if (!OpenSsl.supportsKeyManagerFactory()) {
                     if (keyManagerFactory != null) {
                         throw new IllegalArgumentException(
                                 "KeyManagerFactory not supported");
@@ -159,7 +158,13 @@ public final class ReferenceCountedOpenSslClientContext extends ReferenceCounted
                 //
                 //            See https://github.com/netty/netty/issues/5372
 
-                setVerifyCallback(ctx, engineMap, manager);
+                // Use this to prevent an error when running on java < 7
+                if (useExtendedTrustManager(manager)) {
+                    SSLContext.setCertVerifyCallback(ctx,
+                            new ExtendedTrustManagerVerifyCallback(engineMap, (X509ExtendedTrustManager) manager));
+                } else {
+                    SSLContext.setCertVerifyCallback(ctx, new TrustManagerVerifyCallback(engineMap, manager));
+                }
             } catch (Exception e) {
                 if (keyMaterialProvider != null) {
                     keyMaterialProvider.destroy();
@@ -176,17 +181,6 @@ public final class ReferenceCountedOpenSslClientContext extends ReferenceCounted
             if (keyMaterialProvider != null) {
                 keyMaterialProvider.destroy();
             }
-        }
-    }
-
-    @SuppressJava6Requirement(reason = "Guarded by java version check")
-    private static void setVerifyCallback(long ctx, OpenSslEngineMap engineMap, X509TrustManager manager) {
-        // Use this to prevent an error when running on java < 7
-        if (useExtendedTrustManager(manager)) {
-            SSLContext.setCertVerifyCallback(ctx,
-                    new ExtendedTrustManagerVerifyCallback(engineMap, (X509ExtendedTrustManager) manager));
-        } else {
-            SSLContext.setCertVerifyCallback(ctx, new TrustManagerVerifyCallback(engineMap, manager));
         }
     }
 
@@ -246,7 +240,6 @@ public final class ReferenceCountedOpenSslClientContext extends ReferenceCounted
         }
     }
 
-    @SuppressJava6Requirement(reason = "Usage guarded by java version check")
     private static final class ExtendedTrustManagerVerifyCallback extends AbstractCertificateVerifier {
         private final X509ExtendedTrustManager manager;
 
@@ -310,7 +303,7 @@ public final class ReferenceCountedOpenSslClientContext extends ReferenceCounted
                 // Try all of the supported key types.
                 return SUPPORTED_KEY_TYPES;
             }
-            Set<String> result = new HashSet<String>(clientCertificateTypes.length);
+            Set<String> result = new HashSet<>(clientCertificateTypes.length);
             for (byte keyTypeCode : clientCertificateTypes) {
                 String keyType = clientKeyType(keyTypeCode);
                 if (keyType == null) {

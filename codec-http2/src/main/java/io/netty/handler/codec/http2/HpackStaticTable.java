@@ -167,8 +167,8 @@ final class HpackStaticTable {
     private static CharSequenceMap<Integer> createMap() {
         int length = STATIC_TABLE.size();
         @SuppressWarnings("unchecked")
-        CharSequenceMap<Integer> ret = new CharSequenceMap<Integer>(true,
-                UnsupportedValueConverter.<Integer>instance(), length);
+        CharSequenceMap<Integer> ret = new CharSequenceMap<>(true,
+                UnsupportedValueConverter.instance(), length);
         // Iterate through the static table in reverse order to
         // save the smallest index for a given name in the map.
         for (int index = length; index > 0; index--) {

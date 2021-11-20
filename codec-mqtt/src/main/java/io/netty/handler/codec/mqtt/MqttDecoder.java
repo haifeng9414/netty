@@ -75,7 +75,7 @@ public final class MqttDecoder extends ReplayingDecoder<DecoderState> {
     }
 
     @Override
-    protected void decode(ChannelHandlerContext ctx, ByteBuf buffer, List<Object> out) throws Exception {
+    protected void decode(ChannelHandlerContext ctx, ByteBuf buffer) throws Exception {
         switch (state()) {
             case READ_FIXED_HEADER: try {
                 mqttFixedHeader = decodeFixedHeader(ctx, buffer);
@@ -83,7 +83,7 @@ public final class MqttDecoder extends ReplayingDecoder<DecoderState> {
                 checkpoint(DecoderState.READ_VARIABLE_HEADER);
                 // fall through
             } catch (Exception cause) {
-                out.add(invalidMessage(cause));
+                ctx.fireChannelRead(invalidMessage(cause));
                 return;
             }
 
@@ -97,7 +97,7 @@ public final class MqttDecoder extends ReplayingDecoder<DecoderState> {
                 checkpoint(DecoderState.READ_PAYLOAD);
                 // fall through
             } catch (Exception cause) {
-                out.add(invalidMessage(cause));
+                ctx.fireChannelRead(invalidMessage(cause));
                 return;
             }
 
@@ -120,10 +120,10 @@ public final class MqttDecoder extends ReplayingDecoder<DecoderState> {
                         mqttFixedHeader, variableHeader, decodedPayload.value);
                 mqttFixedHeader = null;
                 variableHeader = null;
-                out.add(message);
+                ctx.fireChannelRead(message);
                 break;
             } catch (Exception cause) {
-                out.add(invalidMessage(cause));
+                ctx.fireChannelRead(invalidMessage(cause));
                 return;
             }
 
@@ -213,7 +213,7 @@ public final class MqttDecoder extends ReplayingDecoder<DecoderState> {
             case PINGREQ:
             case PINGRESP:
                 // Empty variable header
-                return new Result<Object>(null, 0);
+                return new Result<>(null, 0);
             default:
                 //shouldn't reach here
                 throw new DecoderException("Unknown message type: " + mqttFixedHeader.messageType());
@@ -274,7 +274,7 @@ public final class MqttDecoder extends ReplayingDecoder<DecoderState> {
                 cleanSession,
                 keepAlive,
                 properties);
-        return new Result<MqttConnectVariableHeader>(mqttConnectVariableHeader, numberOfBytesConsumed);
+        return new Result<>(mqttConnectVariableHeader, numberOfBytesConsumed);
     }
 
     private static Result<MqttConnAckVariableHeader> decodeConnAckVariableHeader(
@@ -296,7 +296,7 @@ public final class MqttDecoder extends ReplayingDecoder<DecoderState> {
 
         final MqttConnAckVariableHeader mqttConnAckVariableHeader =
                 new MqttConnAckVariableHeader(MqttConnectReturnCode.valueOf(returnCode), sessionPresent, properties);
-        return new Result<MqttConnAckVariableHeader>(mqttConnAckVariableHeader, numberOfBytesConsumed);
+        return new Result<>(mqttConnAckVariableHeader, numberOfBytesConsumed);
     }
 
     private static Result<MqttMessageIdAndPropertiesVariableHeader> decodeMessageIdAndPropertiesVariableHeader(
@@ -406,7 +406,7 @@ public final class MqttDecoder extends ReplayingDecoder<DecoderState> {
 
         final MqttPublishVariableHeader mqttPublishVariableHeader =
                 new MqttPublishVariableHeader(decodedTopic.value, messageId, properties);
-        return new Result<MqttPublishVariableHeader>(mqttPublishVariableHeader, numberOfBytesConsumed);
+        return new Result<>(mqttPublishVariableHeader, numberOfBytesConsumed);
     }
 
     /**
@@ -456,7 +456,7 @@ public final class MqttDecoder extends ReplayingDecoder<DecoderState> {
 
             default:
                 // unknown payload , no byte consumed
-                return new Result<Object>(null, 0);
+                return new Result<>(null, 0);
         }
     }
 
@@ -510,13 +510,13 @@ public final class MqttDecoder extends ReplayingDecoder<DecoderState> {
                         decodedWillMessage != null ? decodedWillMessage : null,
                         decodedUserName != null ? decodedUserName.value : null,
                         decodedPassword != null ? decodedPassword : null);
-        return new Result<MqttConnectPayload>(mqttConnectPayload, numberOfBytesConsumed);
+        return new Result<>(mqttConnectPayload, numberOfBytesConsumed);
     }
 
     private static Result<MqttSubscribePayload> decodeSubscribePayload(
             ByteBuf buffer,
             int bytesRemainingInVariablePart) {
-        final List<MqttTopicSubscription> subscribeTopics = new ArrayList<MqttTopicSubscription>();
+        final List<MqttTopicSubscription> subscribeTopics = new ArrayList<>();
         int numberOfBytesConsumed = 0;
         while (numberOfBytesConsumed < bytesRemainingInVariablePart) {
             final Result<String> decodedTopicName = decodeString(buffer);
@@ -537,20 +537,20 @@ public final class MqttDecoder extends ReplayingDecoder<DecoderState> {
             numberOfBytesConsumed++;
             subscribeTopics.add(new MqttTopicSubscription(decodedTopicName.value, subscriptionOption));
         }
-        return new Result<MqttSubscribePayload>(new MqttSubscribePayload(subscribeTopics), numberOfBytesConsumed);
+        return new Result<>(new MqttSubscribePayload(subscribeTopics), numberOfBytesConsumed);
     }
 
     private static Result<MqttSubAckPayload> decodeSubackPayload(
             ByteBuf buffer,
             int bytesRemainingInVariablePart) {
-        final List<Integer> grantedQos = new ArrayList<Integer>(bytesRemainingInVariablePart);
+        final List<Integer> grantedQos = new ArrayList<>(bytesRemainingInVariablePart);
         int numberOfBytesConsumed = 0;
         while (numberOfBytesConsumed < bytesRemainingInVariablePart) {
             int reasonCode = buffer.readUnsignedByte();
             numberOfBytesConsumed++;
             grantedQos.add(reasonCode);
         }
-        return new Result<MqttSubAckPayload>(new MqttSubAckPayload(grantedQos), numberOfBytesConsumed);
+        return new Result<>(new MqttSubAckPayload(grantedQos), numberOfBytesConsumed);
     }
 
     private static Result<MqttUnsubAckPayload> decodeUnsubAckPayload(
@@ -570,21 +570,21 @@ public final class MqttDecoder extends ReplayingDecoder<DecoderState> {
     private static Result<MqttUnsubscribePayload> decodeUnsubscribePayload(
             ByteBuf buffer,
             int bytesRemainingInVariablePart) {
-        final List<String> unsubscribeTopics = new ArrayList<String>();
+        final List<String> unsubscribeTopics = new ArrayList<>();
         int numberOfBytesConsumed = 0;
         while (numberOfBytesConsumed < bytesRemainingInVariablePart) {
             final Result<String> decodedTopicName = decodeString(buffer);
             numberOfBytesConsumed += decodedTopicName.numberOfBytesConsumed;
             unsubscribeTopics.add(decodedTopicName.value);
         }
-        return new Result<MqttUnsubscribePayload>(
+        return new Result<>(
                 new MqttUnsubscribePayload(unsubscribeTopics),
                 numberOfBytesConsumed);
     }
 
     private static Result<ByteBuf> decodePublishPayload(ByteBuf buffer, int bytesRemainingInVariablePart) {
         ByteBuf b = buffer.readRetainedSlice(bytesRemainingInVariablePart);
-        return new Result<ByteBuf>(b, bytesRemainingInVariablePart);
+        return new Result<>(b, bytesRemainingInVariablePart);
     }
 
     private static Result<String> decodeString(ByteBuf buffer) {
@@ -597,12 +597,12 @@ public final class MqttDecoder extends ReplayingDecoder<DecoderState> {
         if (size < minBytes || size > maxBytes) {
             buffer.skipBytes(size);
             numberOfBytesConsumed += size;
-            return new Result<String>(null, numberOfBytesConsumed);
+            return new Result<>(null, numberOfBytesConsumed);
         }
         String s = buffer.toString(buffer.readerIndex(), size, CharsetUtil.UTF_8);
         buffer.skipBytes(size);
         numberOfBytesConsumed += size;
-        return new Result<String>(s, numberOfBytesConsumed);
+        return new Result<>(s, numberOfBytesConsumed);
     }
 
     /**

@@ -76,7 +76,7 @@ public class SimpleUserEventChannelHandlerTest {
         public List<FooEvent> caughtEvents;
 
         FooEventCatcher() {
-            caughtEvents = new ArrayList<FooEvent>();
+            caughtEvents = new ArrayList<>();
         }
 
         @Override
@@ -85,12 +85,12 @@ public class SimpleUserEventChannelHandlerTest {
         }
     }
 
-    static final class AllEventCatcher extends ChannelInboundHandlerAdapter {
+    static final class AllEventCatcher implements ChannelHandler {
 
         public List<Object> caughtEvents;
 
         AllEventCatcher() {
-            caughtEvents = new ArrayList<Object>();
+            caughtEvents = new ArrayList<>();
         }
 
         @Override

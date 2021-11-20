@@ -16,13 +16,11 @@
 package io.netty.handler.ssl;
 
 import javax.net.ssl.SSLException;
-import javax.net.ssl.SSLHandshakeException;
 import javax.net.ssl.X509ExtendedKeyManager;
 import javax.net.ssl.X509KeyManager;
 import javax.security.auth.x500.X500Principal;
 import java.security.PrivateKey;
 import java.security.cert.X509Certificate;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -50,7 +48,7 @@ final class OpenSslKeyMaterialManager {
     static final String KEY_TYPE_EC_RSA = "EC_RSA";
 
     // key type mappings for types.
-    private static final Map<String, String> KEY_TYPES = new HashMap<String, String>();
+    private static final Map<String, String> KEY_TYPES = new HashMap<>();
     static {
         KEY_TYPES.put("RSA", KEY_TYPE_RSA);
         KEY_TYPES.put("DHE_RSA", KEY_TYPE_RSA);
@@ -70,15 +68,13 @@ final class OpenSslKeyMaterialManager {
     void setKeyMaterialServerSide(ReferenceCountedOpenSslEngine engine) throws SSLException {
         String[] authMethods = engine.authMethods();
         if (authMethods.length == 0) {
-            throw new SSLHandshakeException("Unable to find key material");
+            return;
         }
-
-        boolean matched = false;
         // authMethods may contain duplicates but call chooseServerAlias(...) may be expensive. So let's ensure
         // we filter out duplicates.
-        Set<String> authMethodsSet = new LinkedHashSet<String>(authMethods.length);
+        Set<String> authMethodsSet = new LinkedHashSet<>(authMethods.length);
         Collections.addAll(authMethodsSet, authMethods);
-        Set<String> aliases = new HashSet<String>(authMethodsSet.size());
+        Set<String> aliases = new HashSet<>(authMethodsSet.size());
         for (String authMethod : authMethodsSet) {
             String type = KEY_TYPES.get(authMethod);
             if (type != null) {
@@ -87,13 +83,8 @@ final class OpenSslKeyMaterialManager {
                     if (!setKeyMaterial(engine, alias)) {
                         return;
                     }
-                    matched = true;
                 }
             }
-        }
-        if (!matched) {
-            throw new SSLHandshakeException("Unable to find key material for auth method(s): "
-                    + Arrays.toString(authMethods));
         }
     }
 

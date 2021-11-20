@@ -150,7 +150,7 @@ public class SctpEchoTest extends AbstractSctpTest {
 
     private static class EchoHandler extends SimpleChannelInboundHandler<ByteBuf> {
         volatile Channel channel;
-        final AtomicReference<Throwable> exception = new AtomicReference<Throwable>();
+        final AtomicReference<Throwable> exception = new AtomicReference<>();
         volatile int counter;
 
         @Override
@@ -159,7 +159,7 @@ public class SctpEchoTest extends AbstractSctpTest {
         }
 
         @Override
-        public void channelRead0(ChannelHandlerContext ctx, ByteBuf in) throws Exception {
+        public void messageReceived(ChannelHandlerContext ctx, ByteBuf in) throws Exception {
             byte[] actual = new byte[in.readableBytes()];
             in.readBytes(actual);
 

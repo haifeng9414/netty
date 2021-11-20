@@ -35,7 +35,7 @@ import java.util.List;
 
 import static io.netty.util.internal.EmptyArrays.EMPTY_STRINGS;
 import static io.netty.util.internal.EmptyArrays.EMPTY_X509_CERTIFICATES;
-import static io.netty.util.internal.ObjectUtil.checkNotNull;
+import static java.util.Objects.requireNonNull;
 
 /**
  * Builder for configuring a new SslContext for creation.
@@ -389,11 +389,11 @@ public final class SslContextBuilder {
      */
     public SslContextBuilder keyManager(PrivateKey key, String keyPassword, X509Certificate... keyCertChain) {
         if (forServer) {
-            checkNotNull(keyCertChain, "keyCertChain required for servers");
+            requireNonNull(keyCertChain, "keyCertChain required for servers");
             if (keyCertChain.length == 0) {
                 throw new IllegalArgumentException("keyCertChain must be non-empty");
             }
-            checkNotNull(key, "key required for servers");
+            requireNonNull(key, "key required for servers");
         }
         if (keyCertChain == null || keyCertChain.length == 0) {
             this.keyCertChain = null;
@@ -438,7 +438,7 @@ public final class SslContextBuilder {
      */
     public SslContextBuilder keyManager(KeyManagerFactory keyManagerFactory) {
         if (forServer) {
-            checkNotNull(keyManagerFactory, "keyManagerFactory required for servers");
+            requireNonNull(keyManagerFactory, "keyManagerFactory required for servers");
         }
         keyCertChain = null;
         key = null;
@@ -456,7 +456,7 @@ public final class SslContextBuilder {
      */
     public SslContextBuilder keyManager(KeyManager keyManager) {
         if (forServer) {
-            checkNotNull(keyManager, "keyManager required for servers");
+            requireNonNull(keyManager, "keyManager required for servers");
         }
         if (keyManager != null) {
             this.keyManagerFactory = new KeyManagerFactoryWrapper(keyManager);
@@ -483,8 +483,9 @@ public final class SslContextBuilder {
      * cipher suites will be used.
      */
     public SslContextBuilder ciphers(Iterable<String> ciphers, CipherSuiteFilter cipherFilter) {
-        this.cipherFilter = checkNotNull(cipherFilter, "cipherFilter");
+        requireNonNull(cipherFilter, "cipherFilter");
         this.ciphers = ciphers;
+        this.cipherFilter = cipherFilter;
         return this;
     }
 
@@ -518,7 +519,7 @@ public final class SslContextBuilder {
      * Sets the client authentication mode.
      */
     public SslContextBuilder clientAuth(ClientAuth clientAuth) {
-        this.clientAuth = checkNotNull(clientAuth, "clientAuth");
+        this.clientAuth = requireNonNull(clientAuth, "clientAuth");
         return this;
     }
 
@@ -583,7 +584,7 @@ public final class SslContextBuilder {
         if (iterable == null) {
             return null;
         }
-        final List<T> list = new ArrayList<T>();
+        final List<T> list = new ArrayList<>();
         for (T element : iterable) {
             list.add(element);
         }

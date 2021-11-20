@@ -19,11 +19,10 @@ import io.netty.bootstrap.Bootstrap;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
-import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandler;
+import io.netty.channel.ChannelHandlerAdapter;
 import io.netty.channel.ChannelHandlerContext;
-import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
@@ -47,7 +46,7 @@ import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static org.junit.Assert.assertFalse;
 
 public class Http2MultiplexTransportTest {
-    private static final ChannelHandler DISCARD_HANDLER = new ChannelInboundHandlerAdapter() {
+    private static final ChannelHandler DISCARD_HANDLER = new ChannelHandlerAdapter() {
 
         @Override
         public boolean isSharable() {
@@ -118,7 +117,7 @@ public class Http2MultiplexTransportTest {
                 if (multiplexer != null) {
                     ch.pipeline().addLast(multiplexer);
                 }
-                ch.pipeline().addLast(new ChannelInboundHandlerAdapter() {
+                ch.pipeline().addLast(new ChannelHandler() {
                     @Override
                     public void channelActive(ChannelHandlerContext ctx) {
                         serverConnectedChannelRef.set(ctx.channel());
@@ -146,7 +145,7 @@ public class Http2MultiplexTransportTest {
             protected void initChannel(Channel ch) {
                 ch.pipeline().addLast(Http2MultiplexCodecBuilder
                         .forClient(DISCARD_HANDLER).autoAckSettingsFrame(false).build());
-                ch.pipeline().addLast(new ChannelInboundHandlerAdapter() {
+                ch.pipeline().addLast(new ChannelHandler() {
                     @Override
                     public void channelRead(ChannelHandlerContext ctx, Object msg) {
                         if (msg instanceof Http2SettingsFrame) {
@@ -190,30 +189,19 @@ public class Http2MultiplexTransportTest {
                 @Override
                 protected void initChannel(Channel ch) {
                     ch.pipeline().addLast(new Http2FrameCodecBuilder(true).build());
-                    ch.pipeline().addLast(new Http2MultiplexHandler(new ChannelInboundHandlerAdapter() {
+                    ch.pipeline().addLast(new Http2MultiplexHandler(new ChannelHandler() {
                         @Override
                         public void channelRead(final ChannelHandlerContext ctx, Object msg) {
                             if (msg instanceof Http2HeadersFrame && ((Http2HeadersFrame) msg).isEndStream()) {
-                                executorService.schedule(new Runnable() {
-                                    @Override
-                                    public void run() {
-                                        ctx.writeAndFlush(new DefaultHttp2HeadersFrame(
-                                                new DefaultHttp2Headers(), false)).addListener(
-                                                        new ChannelFutureListener() {
-                                            @Override
-                                            public void operationComplete(ChannelFuture future) {
-                                                ctx.write(new DefaultHttp2DataFrame(
-                                                        Unpooled.copiedBuffer("Hello World", CharsetUtil.US_ASCII),
-                                                        true));
-                                                ctx.channel().eventLoop().execute(new Runnable() {
-                                                    @Override
-                                                    public void run() {
-                                                        ctx.flush();
-                                                    }
-                                                });
-                                            }
-                                        });
-                                    }
+                                executorService.schedule(() -> {
+                                    ctx.writeAndFlush(new DefaultHttp2HeadersFrame(
+                                            new DefaultHttp2Headers(), false)).addListener(
+                                                    (ChannelFutureListener) future -> {
+                                                        ctx.write(new DefaultHttp2DataFrame(
+                                                                Unpooled.copiedBuffer("Hello World",
+                                                                        CharsetUtil.US_ASCII), true));
+                                                        ctx.channel().eventLoop().execute(ctx::flush);
+                                            });
                                 }, 500, TimeUnit.MILLISECONDS);
                             }
                             ReferenceCountUtil.release(msg);
@@ -236,7 +224,7 @@ public class Http2MultiplexTransportTest {
             });
             clientChannel = bs.connect(serverChannel.localAddress()).syncUninterruptibly().channel();
             Http2StreamChannelBootstrap h2Bootstrap = new Http2StreamChannelBootstrap(clientChannel);
-            h2Bootstrap.handler(new ChannelInboundHandlerAdapter() {
+            h2Bootstrap.handler(new ChannelHandler() {
                 @Override
                 public void channelRead(ChannelHandlerContext ctx, Object msg) {
                     if (msg instanceof Http2DataFrame && ((Http2DataFrame) msg).isEndStream()) {

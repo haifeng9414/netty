@@ -37,7 +37,7 @@ public class OpenSslJdkSslEngineInteroptTest extends SSLEngineTest {
 
     @Parameterized.Parameters(name = "{index}: bufferType = {0}, combo = {1}, delegate = {2}, useTasks = {3}")
     public static Collection<Object[]> data() {
-        List<Object[]> params = new ArrayList<Object[]>();
+        List<Object[]> params = new ArrayList<>();
         for (BufferType type: BufferType.values()) {
             params.add(new Object[] { type, ProtocolCipherCombo.tlsv12(), false, false });
             params.add(new Object[] { type, ProtocolCipherCombo.tlsv12(), false, true });

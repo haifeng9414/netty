@@ -15,16 +15,17 @@
  */
 package io.netty.handler.traffic;
 
+import static java.util.Objects.requireNonNull;
+
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandler.Sharable;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPromise;
 import io.netty.util.concurrent.EventExecutor;
-import io.netty.util.internal.ObjectUtil;
-import io.netty.util.internal.PlatformDependent;
 
 import java.util.ArrayDeque;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -80,7 +81,7 @@ public class GlobalTrafficShapingHandler extends AbstractTrafficShapingHandler {
     /**
      * All queues per channel
      */
-    private final ConcurrentMap<Integer, PerChannel> channelQueues = PlatformDependent.newConcurrentHashMap();
+    private final ConcurrentMap<Integer, PerChannel> channelQueues = new ConcurrentHashMap<>();
 
     /**
      * Global queues size
@@ -104,11 +105,8 @@ public class GlobalTrafficShapingHandler extends AbstractTrafficShapingHandler {
      * Create the global TrafficCounter.
      */
     void createGlobalTrafficCounter(ScheduledExecutorService executor) {
-        TrafficCounter tc = new TrafficCounter(this,
-                ObjectUtil.checkNotNull(executor, "executor"),
-                "GlobalTC",
-                checkInterval);
-
+        requireNonNull(executor, "executor");
+        TrafficCounter tc = new TrafficCounter(this, executor, "GlobalTC", checkInterval);
         setTrafficCounter(tc);
         tc.start();
     }
@@ -245,7 +243,7 @@ public class GlobalTrafficShapingHandler extends AbstractTrafficShapingHandler {
         PerChannel perChannel = channelQueues.get(key);
         if (perChannel == null) {
             perChannel = new PerChannel();
-            perChannel.messagesQueue = new ArrayDeque<ToSend>();
+            perChannel.messagesQueue = new ArrayDeque<>();
             perChannel.queueSize = 0L;
             perChannel.lastReadTimestamp = TrafficCounter.milliSecondFromNano();
             perChannel.lastWriteTimestamp = perChannel.lastReadTimestamp;
@@ -367,12 +365,7 @@ public class GlobalTrafficShapingHandler extends AbstractTrafficShapingHandler {
         }
         final long futureNow = newToSend.relativeTimeAction;
         final PerChannel forSchedule = perChannel;
-        ctx.executor().schedule(new Runnable() {
-            @Override
-            public void run() {
-                sendAllValid(ctx, forSchedule, futureNow);
-            }
-        }, delay, TimeUnit.MILLISECONDS);
+        ctx.executor().schedule(() -> sendAllValid(ctx, forSchedule, futureNow), delay, TimeUnit.MILLISECONDS);
     }
 
     private void sendAllValid(final ChannelHandlerContext ctx, final PerChannel perChannel, final long now) {

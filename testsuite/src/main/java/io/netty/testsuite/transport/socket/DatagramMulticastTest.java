@@ -23,7 +23,6 @@ import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.channel.socket.DatagramChannel;
 import io.netty.channel.socket.DatagramPacket;
 import io.netty.channel.socket.InternetProtocolFamily;
-import io.netty.channel.socket.oio.OioDatagramChannel;
 import io.netty.testsuite.transport.TestsuitePermutation;
 import io.netty.util.internal.SocketUtils;
 import org.junit.Assume;
@@ -58,7 +57,7 @@ public class DatagramMulticastTest extends AbstractDatagramTest {
 
         sb.handler(new SimpleChannelInboundHandler<Object>() {
             @Override
-            public void channelRead0(ChannelHandlerContext ctx, Object msg) throws Exception {
+            public void messageReceived(ChannelHandlerContext ctx, Object msg) throws Exception {
                 // Nothing will be sent.
             }
         });
@@ -78,13 +77,6 @@ public class DatagramMulticastTest extends AbstractDatagramTest {
         InetSocketAddress addr = sc.localAddress();
         cb.localAddress(addr.getPort());
 
-        if (sc instanceof OioDatagramChannel) {
-            // skip the test for OIO, as it fails because of
-            // No route to host which makes no sense.
-            // Maybe a JDK bug ?
-            sc.close().awaitUninterruptibly();
-            return;
-        }
         DatagramChannel cc = (DatagramChannel) cb.bind().sync().channel();
         assertEquals(iface, cc.config().getNetworkInterface());
         assertInterfaceAddress(iface, cc.config().getInterface());
@@ -139,7 +131,7 @@ public class DatagramMulticastTest extends AbstractDatagramTest {
         private volatile boolean fail;
 
         @Override
-        protected void channelRead0(ChannelHandlerContext ctx, DatagramPacket msg) throws Exception {
+        protected void messageReceived(ChannelHandlerContext ctx, DatagramPacket msg) throws Exception {
             if (done) {
                 fail = true;
             }

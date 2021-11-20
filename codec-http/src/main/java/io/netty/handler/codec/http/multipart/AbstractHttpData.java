@@ -15,11 +15,12 @@
  */
 package io.netty.handler.codec.http.multipart;
 
+import static java.util.Objects.requireNonNull;
+
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelException;
 import io.netty.handler.codec.http.HttpConstants;
 import io.netty.util.AbstractReferenceCounted;
-import io.netty.util.internal.ObjectUtil;
 
 import java.io.IOException;
 import java.nio.charset.Charset;
@@ -41,7 +42,7 @@ public abstract class AbstractHttpData extends AbstractReferenceCounted implemen
     private long maxSize = DefaultHttpDataFactory.MAXSIZE;
 
     protected AbstractHttpData(String name, Charset charset, long size) {
-        ObjectUtil.checkNotNull(name, "name");
+        requireNonNull(name, "name");
 
         name = REPLACE_PATTERN.matcher(name).replaceAll(" ");
         name = STRIP_PATTERN.matcher(name).replaceAll("");
@@ -95,7 +96,8 @@ public abstract class AbstractHttpData extends AbstractReferenceCounted implemen
 
     @Override
     public void setCharset(Charset charset) {
-        this.charset = ObjectUtil.checkNotNull(charset, "charset");
+        requireNonNull(charset, "charset");
+        this.charset = charset;
     }
 
     @Override

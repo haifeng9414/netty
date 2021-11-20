@@ -15,8 +15,9 @@
  */
 package io.netty.handler.codec.socksx.v5;
 
+import static java.util.Objects.requireNonNull;
+
 import io.netty.handler.codec.DecoderResult;
-import io.netty.util.internal.ObjectUtil;
 import io.netty.util.internal.StringUtil;
 
 /**
@@ -27,7 +28,8 @@ public class DefaultSocks5InitialResponse extends AbstractSocks5Message implemen
     private final Socks5AuthMethod authMethod;
 
     public DefaultSocks5InitialResponse(Socks5AuthMethod authMethod) {
-        this.authMethod = ObjectUtil.checkNotNull(authMethod, "authMethod");
+        requireNonNull(authMethod, "authMethod");
+        this.authMethod = authMethod;
     }
 
     @Override

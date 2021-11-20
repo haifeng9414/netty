@@ -17,7 +17,6 @@ package io.netty.util;
 
 import io.netty.util.internal.EmptyArrays;
 import io.netty.util.internal.InternalThreadLocalMap;
-import io.netty.util.internal.ObjectUtil;
 import io.netty.util.internal.PlatformDependent;
 
 import java.nio.ByteBuffer;
@@ -31,7 +30,7 @@ import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
 
 import static io.netty.util.internal.MathUtil.isOutOfBounds;
-import static io.netty.util.internal.ObjectUtil.checkNotNull;
+import static java.util.Objects.requireNonNull;
 
 /**
  * A string which has been encoded into a character encoding whose character always takes a single byte, similarly to
@@ -414,7 +413,7 @@ public final class AsciiString implements CharSequence, Comparable<CharSequence>
                             + length + ") <= srcLen(" + length() + ')');
         }
 
-        System.arraycopy(value, srcIdx + offset, checkNotNull(dst, "dst"), dstIdx, length);
+        System.arraycopy(value, srcIdx + offset, requireNonNull(dst, "dst"), dstIdx, length);
     }
 
     @Override
@@ -590,7 +589,7 @@ public final class AsciiString implements CharSequence, Comparable<CharSequence>
      * @param length the number of characters to copy.
      */
     public void copy(int srcIdx, char[] dst, int dstIdx, int length) {
-        ObjectUtil.checkNotNull(dst, "dst");
+        requireNonNull(dst, "dst");
 
         if (isOutOfBounds(srcIdx, length, length())) {
             throw new IndexOutOfBoundsException("expected: " + "0 <= srcIdx(" + srcIdx + ") <= srcIdx + length("
@@ -799,7 +798,7 @@ public final class AsciiString implements CharSequence, Comparable<CharSequence>
      * @throws NullPointerException if {@code string} is {@code null}.
      */
     public boolean regionMatches(int thisStart, CharSequence string, int start, int length) {
-        ObjectUtil.checkNotNull(string, "string");
+        requireNonNull(string, "string");
 
         if (start < 0 || string.length() - start < length) {
             return false;
@@ -840,7 +839,7 @@ public final class AsciiString implements CharSequence, Comparable<CharSequence>
             return regionMatches(thisStart, string, start, length);
         }
 
-        ObjectUtil.checkNotNull(string, "string");
+        requireNonNull(string, "string");
 
         final int thisLen = length();
         if (thisStart < 0 || length > thisLen - thisStart) {

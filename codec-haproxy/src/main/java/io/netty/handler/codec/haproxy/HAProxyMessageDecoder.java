@@ -21,7 +21,8 @@ import io.netty.handler.codec.ByteToMessageDecoder;
 import io.netty.handler.codec.ProtocolDetectionResult;
 import io.netty.util.CharsetUtil;
 
-import java.util.List;
+
+import static io.netty.handler.codec.haproxy.HAProxyConstants.*;
 
 import static io.netty.handler.codec.haproxy.HAProxyConstants.*;
 
@@ -232,7 +233,15 @@ public class HAProxyMessageDecoder extends ByteToMessageDecoder {
     }
 
     @Override
-    protected final void decode(ChannelHandlerContext ctx, ByteBuf in, List<Object> out) throws Exception {
+    public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
+        ctx.fireExceptionCaught(cause);
+        if (cause instanceof HAProxyProtocolException) {
+            ctx.close(); // drop connection immediately per spec
+        }
+    }
+
+    @Override
+    protected final void decode(ChannelHandlerContext ctx, ByteBuf in) throws Exception {
         // determine the specification version
         if (version == -1) {
             if ((version = findVersion(in)) == -1) {
@@ -252,9 +261,9 @@ public class HAProxyMessageDecoder extends ByteToMessageDecoder {
             finished = true;
             try {
                 if (version == 1) {
-                    out.add(HAProxyMessage.decodeHeader(decoded.toString(CharsetUtil.US_ASCII)));
+                    ctx.fireChannelRead(HAProxyMessage.decodeHeader(decoded.toString(CharsetUtil.US_ASCII)));
                 } else {
-                    out.add(HAProxyMessage.decodeHeader(decoded));
+                    ctx.fireChannelRead(HAProxyMessage.decodeHeader(decoded));
                 }
             } catch (HAProxyProtocolException e) {
                 fail(ctx, null, e);
@@ -303,7 +312,6 @@ public class HAProxyMessageDecoder extends ByteToMessageDecoder {
 
     private void fail(final ChannelHandlerContext ctx, String errMsg, Exception e) {
         finished = true;
-        ctx.close(); // drop connection immediately per spec
         HAProxyProtocolException ppex;
         if (errMsg != null && e != null) {
             ppex = new HAProxyProtocolException(errMsg, e);

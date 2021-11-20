@@ -23,6 +23,7 @@ import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelMetadata;
 import io.netty.channel.ChannelOutboundBuffer;
 import io.netty.channel.ChannelPipeline;
+import io.netty.channel.EventLoop;
 import io.netty.channel.FileRegion;
 import io.netty.channel.RecvByteBufAllocator;
 import io.netty.channel.internal.ChannelUtils;
@@ -46,13 +47,10 @@ public abstract class AbstractNioByteChannel extends AbstractNioChannel {
             " (expected: " + StringUtil.simpleClassName(ByteBuf.class) + ", " +
             StringUtil.simpleClassName(FileRegion.class) + ')';
 
-    private final Runnable flushTask = new Runnable() {
-        @Override
-        public void run() {
-            // Calling flush0 directly to ensure we not try to flush messages that were added via write(...) in the
-            // meantime.
-            ((AbstractNioUnsafe) unsafe()).flush0();
-        }
+    private final Runnable flushTask = () -> {
+        // Calling flush0 directly to ensure we not try to flush messages that were added via write(...) in the
+        // meantime.
+        ((AbstractNioUnsafe) unsafe()).flush0();
     };
     private boolean inputClosedSeenErrorOnRead;
 
@@ -60,10 +58,11 @@ public abstract class AbstractNioByteChannel extends AbstractNioChannel {
      * Create a new instance
      *
      * @param parent            the parent {@link Channel} by which this instance was created. May be {@code null}
+     * @param eventLoop         the {@link EventLoop} to use for IO.
      * @param ch                the underlying {@link SelectableChannel} on which it operates
      */
-    protected AbstractNioByteChannel(Channel parent, SelectableChannel ch) {
-        super(parent, ch, SelectionKey.OP_READ);
+    protected AbstractNioByteChannel(Channel parent, EventLoop eventLoop, SelectableChannel ch) {
+        super(parent, eventLoop, ch, SelectionKey.OP_READ);
     }
 
     /**
@@ -128,6 +127,8 @@ public abstract class AbstractNioByteChannel extends AbstractNioChannel {
             // See https://github.com/netty/netty/issues/10434
             if (close || cause instanceof OutOfMemoryError || cause instanceof IOException) {
                 closeOnRead(pipeline);
+            } else {
+                readIfIsAutoRead();
             }
         }
 
@@ -172,6 +173,8 @@ public abstract class AbstractNioByteChannel extends AbstractNioChannel {
 
                 if (close) {
                     closeOnRead(pipeline);
+                } else {
+                    readIfIsAutoRead();
                 }
             } catch (Throwable t) {
                 handleReadException(pipeline, byteBuf, t, close, allocHandle);
@@ -327,7 +330,7 @@ public abstract class AbstractNioByteChannel extends AbstractNioChannel {
         // Check first if the key is still valid as it may be canceled as part of the deregistration
         // from the EventLoop
         // See https://github.com/netty/netty/issues/2104
-        if (!key.isValid()) {
+        if (key == null || !key.isValid()) {
             return;
         }
         final int interestOps = key.interestOps();
@@ -341,7 +344,7 @@ public abstract class AbstractNioByteChannel extends AbstractNioChannel {
         // Check first if the key is still valid as it may be canceled as part of the deregistration
         // from the EventLoop
         // See https://github.com/netty/netty/issues/2104
-        if (!key.isValid()) {
+        if (key == null || !key.isValid()) {
             return;
         }
         final int interestOps = key.interestOps();

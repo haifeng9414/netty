@@ -15,6 +15,7 @@
  */
 package io.netty.util.concurrent;
 
+import org.junit.Assert;
 import org.junit.Test;
 
 import java.util.concurrent.Callable;
@@ -26,11 +27,7 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 
 public class AbstractScheduledEventExecutorTest {
-    private static final Runnable TEST_RUNNABLE = new Runnable() {
-
-        @Override
-        public void run() {
-        }
+    private static final Runnable TEST_RUNNABLE = () -> {
     };
 
     private static final Callable<?> TEST_CALLABLE = Executors.callable(TEST_RUNNABLE);
@@ -93,6 +90,11 @@ public class AbstractScheduledEventExecutorTest {
     public void testScheduleWithFixedDelayNegative() {
         TestScheduledEventExecutor executor = new TestScheduledEventExecutor();
         executor.scheduleWithFixedDelay(TEST_RUNNABLE, 0, -1, TimeUnit.DAYS);
+    }
+
+    @Test
+    public void testDeadlineNanosNotOverflow() {
+        Assert.assertEquals(Long.MAX_VALUE, AbstractScheduledEventExecutor.deadlineNanos(Long.MAX_VALUE));
     }
 
     private static final class TestScheduledEventExecutor extends AbstractScheduledEventExecutor {

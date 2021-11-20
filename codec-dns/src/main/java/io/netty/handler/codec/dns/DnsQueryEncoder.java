@@ -17,7 +17,7 @@ package io.netty.handler.codec.dns;
 
 import io.netty.buffer.ByteBuf;
 
-import static io.netty.util.internal.ObjectUtil.checkNotNull;
+import java.util.Objects;
 
 final class DnsQueryEncoder {
 
@@ -27,7 +27,7 @@ final class DnsQueryEncoder {
      * Creates a new encoder with the specified {@code recordEncoder}.
      */
     DnsQueryEncoder(DnsRecordEncoder recordEncoder) {
-        this.recordEncoder = checkNotNull(recordEncoder, "recordEncoder");
+        this.recordEncoder = Objects.requireNonNull(recordEncoder, "recordEncoder");
     }
 
     /**

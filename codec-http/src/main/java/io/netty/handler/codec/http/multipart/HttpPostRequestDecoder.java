@@ -15,13 +15,14 @@
  */
 package io.netty.handler.codec.http.multipart;
 
+import static java.util.Objects.requireNonNull;
+
 import io.netty.handler.codec.DecoderException;
 import io.netty.handler.codec.http.HttpConstants;
 import io.netty.handler.codec.http.HttpContent;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpHeaderValues;
 import io.netty.handler.codec.http.HttpRequest;
-import io.netty.util.internal.ObjectUtil;
 import io.netty.util.internal.StringUtil;
 
 import java.nio.charset.Charset;
@@ -84,10 +85,9 @@ public class HttpPostRequestDecoder implements InterfaceHttpPostRequestDecoder {
      *             errors
      */
     public HttpPostRequestDecoder(HttpDataFactory factory, HttpRequest request, Charset charset) {
-        ObjectUtil.checkNotNull(factory, "factory");
-        ObjectUtil.checkNotNull(request, "request");
-        ObjectUtil.checkNotNull(charset, "charset");
-
+        requireNonNull(factory, "factory");
+        requireNonNull(request, "request");
+        requireNonNull(charset, "charset");
         // Fill default values
         if (isMultipart(request)) {
             decoder = new HttpPostMultipartRequestDecoder(factory, request, charset);

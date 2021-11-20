@@ -15,6 +15,8 @@
  */
 package io.netty.handler.codec.http.websocketx;
 
+import static java.util.Objects.requireNonNull;
+
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelFutureListener;
@@ -35,7 +37,6 @@ import io.netty.handler.codec.http.HttpResponseDecoder;
 import io.netty.handler.codec.http.HttpScheme;
 import io.netty.util.NetUtil;
 import io.netty.util.ReferenceCountUtil;
-import io.netty.util.internal.ObjectUtil;
 
 import java.net.URI;
 import java.nio.channels.ClosedChannelException;
@@ -234,7 +235,7 @@ public abstract class WebSocketClientHandshaker {
      *            Channel
      */
     public ChannelFuture handshake(Channel channel) {
-        ObjectUtil.checkNotNull(channel, "channel");
+        requireNonNull(channel, "channel");
         return handshake(channel, channel.newPromise());
     }
 
@@ -260,26 +261,23 @@ public abstract class WebSocketClientHandshaker {
 
         FullHttpRequest request = newHandshakeRequest();
 
-        channel.writeAndFlush(request).addListener(new ChannelFutureListener() {
-            @Override
-            public void operationComplete(ChannelFuture future) {
-                if (future.isSuccess()) {
-                    ChannelPipeline p = future.channel().pipeline();
-                    ChannelHandlerContext ctx = p.context(HttpRequestEncoder.class);
-                    if (ctx == null) {
-                        ctx = p.context(HttpClientCodec.class);
-                    }
-                    if (ctx == null) {
-                        promise.setFailure(new IllegalStateException("ChannelPipeline does not contain " +
-                                "an HttpRequestEncoder or HttpClientCodec"));
-                        return;
-                    }
-                    p.addAfter(ctx.name(), "ws-encoder", newWebSocketEncoder());
-
-                    promise.setSuccess();
-                } else {
-                    promise.setFailure(future.cause());
+        channel.writeAndFlush(request).addListener((ChannelFutureListener) future -> {
+            if (future.isSuccess()) {
+                ChannelPipeline p = future.channel().pipeline();
+                ChannelHandlerContext ctx = p.context(HttpRequestEncoder.class);
+                if (ctx == null) {
+                    ctx = p.context(HttpClientCodec.class);
                 }
+                if (ctx == null) {
+                    promise.setFailure(new IllegalStateException("ChannelPipeline does not contain " +
+                            "an HttpRequestEncoder or HttpClientCodec"));
+                    return;
+                }
+                p.addAfter(ctx.name(), "ws-encoder", newWebSocketEncoder());
+
+                promise.setSuccess();
+            } else {
+                promise.setFailure(future.cause());
             }
         });
         return promise;
@@ -360,12 +358,7 @@ public abstract class WebSocketClientHandshaker {
             // Delay the removal of the decoder so the user can setup the pipeline if needed to handle
             // WebSocketFrame messages.
             // See https://github.com/netty/netty/issues/4533
-            channel.eventLoop().execute(new Runnable() {
-                @Override
-                public void run() {
-                    p.remove(codec);
-                }
-            });
+            channel.eventLoop().execute(() -> p.remove(codec));
         } else {
             if (p.get(HttpRequestEncoder.class) != null) {
                 // Remove the encoder part of the codec as the user may start writing frames after this method returns.
@@ -377,12 +370,7 @@ public abstract class WebSocketClientHandshaker {
             // Delay the removal of the decoder so the user can setup the pipeline if needed to handle
             // WebSocketFrame messages.
             // See https://github.com/netty/netty/issues/4533
-            channel.eventLoop().execute(new Runnable() {
-                @Override
-                public void run() {
-                    p.remove(context.handler());
-                }
-            });
+            channel.eventLoop().execute(() -> p.remove(context.handler()));
         }
     }
 
@@ -439,7 +427,7 @@ public abstract class WebSocketClientHandshaker {
             p.addAfter(ctx.name(), aggregatorName, new HttpObjectAggregator(8192));
             p.addAfter(aggregatorName, "handshaker", new SimpleChannelInboundHandler<FullHttpResponse>() {
                 @Override
-                protected void channelRead0(ChannelHandlerContext ctx, FullHttpResponse msg) throws Exception {
+                protected void messageReceived(ChannelHandlerContext ctx, FullHttpResponse msg) throws Exception {
                     // Remove ourself and do the actual handshake
                     ctx.pipeline().remove(this);
                     try {
@@ -499,7 +487,7 @@ public abstract class WebSocketClientHandshaker {
      *            Closing Frame that was received
      */
     public ChannelFuture close(Channel channel, CloseWebSocketFrame frame) {
-        ObjectUtil.checkNotNull(channel, "channel");
+        requireNonNull(channel, "channel");
         return close(channel, frame, channel.newPromise());
     }
 
@@ -514,7 +502,8 @@ public abstract class WebSocketClientHandshaker {
      *            the {@link ChannelPromise} to be notified when the closing handshake is done
      */
     public ChannelFuture close(Channel channel, CloseWebSocketFrame frame, ChannelPromise promise) {
-        ObjectUtil.checkNotNull(channel, "channel");
+        requireNonNull(channel, "channel");
+
         channel.writeAndFlush(frame, promise);
         applyForceCloseTimeout(channel, promise);
         return promise;
@@ -527,32 +516,23 @@ public abstract class WebSocketClientHandshaker {
             return;
         }
 
-        flushFuture.addListener(new ChannelFutureListener() {
-            @Override
-            public void operationComplete(ChannelFuture future) throws Exception {
-                // If flush operation failed, there is no reason to expect
-                // a server to receive CloseFrame. Thus this should be handled
-                // by the application separately.
-                // Also, close might be called twice from different threads.
-                if (future.isSuccess() && channel.isActive() &&
-                        FORCE_CLOSE_INIT_UPDATER.compareAndSet(handshaker, 0, 1)) {
-                    final Future<?> forceCloseFuture = channel.eventLoop().schedule(new Runnable() {
-                        @Override
-                        public void run() {
-                            if (channel.isActive()) {
-                                channel.close();
-                                forceCloseComplete = true;
-                            }
-                        }
-                    }, forceCloseTimeoutMillis, TimeUnit.MILLISECONDS);
+        flushFuture.addListener(future -> {
+            // If flush operation failed, there is no reason to expect
+            // a server to receive CloseFrame. Thus this should be handled
+            // by the application separately.
+            // Also, close might be called twice from different threads.
+            if (future.isSuccess() && channel.isActive() &&
+                    FORCE_CLOSE_INIT_UPDATER.compareAndSet(handshaker, 0, 1)) {
+                final Future<?> forceCloseFuture = channel.eventLoop().schedule(() -> {
+                    if (channel.isActive()) {
+                        channel.close();
+                        forceCloseComplete = true;
+                    }
+                }, forceCloseTimeoutMillis, TimeUnit.MILLISECONDS);
 
-                    channel.closeFuture().addListener(new ChannelFutureListener() {
-                        @Override
-                        public void operationComplete(ChannelFuture future) throws Exception {
-                            forceCloseFuture.cancel(false);
-                        }
-                    });
-                }
+                channel.closeFuture().addListener(ignore -> {
+                    forceCloseFuture.cancel(false);
+                });
             }
         });
     }

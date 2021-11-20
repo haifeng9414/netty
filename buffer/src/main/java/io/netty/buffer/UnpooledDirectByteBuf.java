@@ -15,7 +15,9 @@
  */
 package io.netty.buffer;
 
-import io.netty.util.internal.ObjectUtil;
+import static io.netty.util.internal.ObjectUtil.checkPositiveOrZero;
+import static java.util.Objects.requireNonNull;
+
 import io.netty.util.internal.PlatformDependent;
 
 import java.io.IOException;
@@ -27,8 +29,6 @@ import java.nio.channels.ClosedChannelException;
 import java.nio.channels.FileChannel;
 import java.nio.channels.GatheringByteChannel;
 import java.nio.channels.ScatteringByteChannel;
-
-import static io.netty.util.internal.ObjectUtil.checkPositiveOrZero;
 
 /**
  * A NIO {@link ByteBuffer} based buffer. It is recommended to use
@@ -52,7 +52,7 @@ public class UnpooledDirectByteBuf extends AbstractReferenceCountedByteBuf {
      */
     public UnpooledDirectByteBuf(ByteBufAllocator alloc, int initialCapacity, int maxCapacity) {
         super(maxCapacity);
-        ObjectUtil.checkNotNull(alloc, "alloc");
+        requireNonNull(alloc, "alloc");
         checkPositiveOrZero(initialCapacity, "initialCapacity");
         checkPositiveOrZero(maxCapacity, "maxCapacity");
         if (initialCapacity > maxCapacity) {
@@ -76,8 +76,8 @@ public class UnpooledDirectByteBuf extends AbstractReferenceCountedByteBuf {
     UnpooledDirectByteBuf(ByteBufAllocator alloc, ByteBuffer initialBuffer,
             int maxCapacity, boolean doFree, boolean slice) {
         super(maxCapacity);
-        ObjectUtil.checkNotNull(alloc, "alloc");
-        ObjectUtil.checkNotNull(initialBuffer, "initialBuffer");
+        requireNonNull(alloc, "alloc");
+        requireNonNull(initialBuffer, "initialBuffer");
         if (!initialBuffer.isDirect()) {
             throw new IllegalArgumentException("initialBuffer is not a direct buffer.");
         }

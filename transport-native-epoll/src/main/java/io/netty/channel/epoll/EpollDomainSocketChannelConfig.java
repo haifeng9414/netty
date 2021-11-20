@@ -15,6 +15,8 @@
  */
 package io.netty.channel.epoll;
 
+import static java.util.Objects.requireNonNull;
+
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.channel.ChannelOption;
 import io.netty.channel.MessageSizeEstimator;
@@ -23,7 +25,6 @@ import io.netty.channel.WriteBufferWaterMark;
 import io.netty.channel.socket.SocketChannelConfig;
 import io.netty.channel.unix.DomainSocketChannelConfig;
 import io.netty.channel.unix.DomainSocketReadMode;
-import io.netty.util.internal.ObjectUtil;
 
 import java.io.IOException;
 import java.util.Map;
@@ -154,14 +155,9 @@ public final class EpollDomainSocketChannelConfig extends EpollChannelConfig
     }
 
     @Override
-    public EpollDomainSocketChannelConfig setEpollMode(EpollMode mode) {
-        super.setEpollMode(mode);
-        return this;
-    }
-
-    @Override
     public EpollDomainSocketChannelConfig setReadMode(DomainSocketReadMode mode) {
-        this.mode = ObjectUtil.checkNotNull(mode, "mode");
+        requireNonNull(mode, "mode");
+        this.mode = mode;
         return this;
     }
 
@@ -185,6 +181,7 @@ public final class EpollDomainSocketChannelConfig extends EpollChannelConfig
         return this;
     }
 
+    @Override
     public int getSendBufferSize() {
         try {
             return ((EpollDomainSocketChannel) channel).socket.getSendBufferSize();
@@ -193,6 +190,7 @@ public final class EpollDomainSocketChannelConfig extends EpollChannelConfig
         }
     }
 
+    @Override
     public EpollDomainSocketChannelConfig setSendBufferSize(int sendBufferSize) {
         try {
             ((EpollDomainSocketChannel) channel).socket.setSendBufferSize(sendBufferSize);
@@ -202,6 +200,7 @@ public final class EpollDomainSocketChannelConfig extends EpollChannelConfig
         }
     }
 
+    @Override
     public int getReceiveBufferSize() {
         try {
             return ((EpollDomainSocketChannel) channel).socket.getReceiveBufferSize();
@@ -210,6 +209,7 @@ public final class EpollDomainSocketChannelConfig extends EpollChannelConfig
         }
     }
 
+    @Override
     public EpollDomainSocketChannelConfig setReceiveBufferSize(int receiveBufferSize) {
         try {
             ((EpollDomainSocketChannel) channel).socket.setReceiveBufferSize(receiveBufferSize);

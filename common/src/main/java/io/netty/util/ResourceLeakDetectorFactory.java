@@ -16,6 +16,8 @@
 
 package io.netty.util;
 
+import static java.util.Objects.requireNonNull;
+
 import io.netty.util.internal.ObjectUtil;
 import io.netty.util.internal.PlatformDependent;
 import io.netty.util.internal.SystemPropertyUtil;
@@ -49,7 +51,7 @@ public abstract class ResourceLeakDetectorFactory {
      * @param factory the instance that will become the current {@link ResourceLeakDetectorFactory}'s singleton
      */
     public static void setResourceLeakDetectorFactory(ResourceLeakDetectorFactory factory) {
-        factoryInstance = ObjectUtil.checkNotNull(factory, "factory");
+        factoryInstance = requireNonNull(factory, "factory");
     }
 
     /**
@@ -169,8 +171,8 @@ public abstract class ResourceLeakDetectorFactory {
                 }
             }
 
-            ResourceLeakDetector<T> resourceLeakDetector = new ResourceLeakDetector<T>(resource, samplingInterval,
-                                                                                       maxActive);
+            ResourceLeakDetector<T> resourceLeakDetector = new ResourceLeakDetector<>(resource, samplingInterval,
+                    maxActive);
             logger.debug("Loaded default ResourceLeakDetector: {}", resourceLeakDetector);
             return resourceLeakDetector;
         }
@@ -192,7 +194,7 @@ public abstract class ResourceLeakDetectorFactory {
                 }
             }
 
-            ResourceLeakDetector<T> resourceLeakDetector = new ResourceLeakDetector<T>(resource, samplingInterval);
+            ResourceLeakDetector<T> resourceLeakDetector = new ResourceLeakDetector<>(resource, samplingInterval);
             logger.debug("Loaded default ResourceLeakDetector: {}", resourceLeakDetector);
             return resourceLeakDetector;
         }

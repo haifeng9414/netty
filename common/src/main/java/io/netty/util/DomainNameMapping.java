@@ -24,8 +24,8 @@ import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
 
-import static io.netty.util.internal.ObjectUtil.checkNotNull;
 import static io.netty.util.internal.StringUtil.commonSuffixOfLength;
+import static java.util.Objects.requireNonNull;
 
 /**
  * Maps a domain name to its associated value object.
@@ -64,11 +64,11 @@ public class DomainNameMapping<V> implements Mapping<String, V> {
      */
     @Deprecated
     public DomainNameMapping(int initialCapacity, V defaultValue) {
-        this(new LinkedHashMap<String, V>(initialCapacity), defaultValue);
+        this(new LinkedHashMap<>(initialCapacity), defaultValue);
     }
 
     DomainNameMapping(Map<String, V> map, V defaultValue) {
-        this.defaultValue = checkNotNull(defaultValue, "defaultValue");
+        this.defaultValue = requireNonNull(defaultValue, "defaultValue");
         this.map = map;
         unmodifiableMap = map != null ? Collections.unmodifiableMap(map)
                                       : null;
@@ -88,7 +88,7 @@ public class DomainNameMapping<V> implements Mapping<String, V> {
      */
     @Deprecated
     public DomainNameMapping<V> add(String hostname, V output) {
-        map.put(normalizeHostname(checkNotNull(hostname, "hostname")), checkNotNull(output, "output"));
+        map.put(normalizeHostname(requireNonNull(hostname, "hostname")), requireNonNull(output, "output"));
         return this;
     }
 

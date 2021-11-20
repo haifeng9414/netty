@@ -15,6 +15,8 @@
  */
 package io.netty.handler.codec.string;
 
+import static java.util.Objects.requireNonNull;
+
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufUtil;
 import io.netty.channel.ChannelHandler.Sharable;
@@ -22,7 +24,6 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPipeline;
 import io.netty.handler.codec.LineBasedFrameDecoder;
 import io.netty.handler.codec.MessageToMessageEncoder;
-import io.netty.util.internal.ObjectUtil;
 
 import java.nio.CharBuffer;
 import java.nio.charset.Charset;
@@ -65,7 +66,8 @@ public class StringEncoder extends MessageToMessageEncoder<CharSequence> {
      * Creates a new instance with the specified character set.
      */
     public StringEncoder(Charset charset) {
-        this.charset = ObjectUtil.checkNotNull(charset, "charset");
+        requireNonNull(charset, "charset");
+        this.charset = charset;
     }
 
     @Override

@@ -55,7 +55,7 @@ public class PcapWriteHandlerTest {
                 .channel(NioDatagramChannel.class)
                 .handler(new SimpleChannelInboundHandler<DatagramPacket>() {
                     @Override
-                    protected void channelRead0(ChannelHandlerContext ctx, DatagramPacket msg) {
+                    protected void messageReceived(ChannelHandlerContext ctx, DatagramPacket msg) {
                         // Discard
                     }
                 });

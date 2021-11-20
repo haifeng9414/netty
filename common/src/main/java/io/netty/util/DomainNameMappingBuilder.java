@@ -21,7 +21,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
 
-import static io.netty.util.internal.ObjectUtil.checkNotNull;
+import static java.util.Objects.requireNonNull;
 
 /**
  * Builder for immutable {@link DomainNameMapping} instances.
@@ -53,8 +53,8 @@ public final class DomainNameMappingBuilder<V> {
      *                        when nothing matches the input
      */
     public DomainNameMappingBuilder(int initialCapacity, V defaultValue) {
-        this.defaultValue = checkNotNull(defaultValue, "defaultValue");
-        map = new LinkedHashMap<String, V>(initialCapacity);
+        this.defaultValue = requireNonNull(defaultValue, "defaultValue");
+        map = new LinkedHashMap<>(initialCapacity);
     }
 
     /**
@@ -70,7 +70,7 @@ public final class DomainNameMappingBuilder<V> {
      *                 when the specified host name matches the specified input host name
      */
     public DomainNameMappingBuilder<V> add(String hostname, V output) {
-        map.put(checkNotNull(hostname, "hostname"), checkNotNull(output, "output"));
+        map.put(requireNonNull(hostname, "hostname"), requireNonNull(output, "output"));
         return this;
     }
 
@@ -81,7 +81,7 @@ public final class DomainNameMappingBuilder<V> {
      * @return new {@link DomainNameMapping} instance
      */
     public DomainNameMapping<V> build() {
-        return new ImmutableDomainNameMapping<V>(defaultValue, map);
+        return new ImmutableDomainNameMapping<>(defaultValue, map);
     }
 
     /**
@@ -110,7 +110,7 @@ public final class DomainNameMappingBuilder<V> {
             domainNamePatterns = new String[numberOfMappings];
             values = (V[]) new Object[numberOfMappings];
 
-            final Map<String, V> mapCopy = new LinkedHashMap<String, V>(map.size());
+            final Map<String, V> mapCopy = new LinkedHashMap<>(map.size());
             int index = 0;
             for (Map.Entry<String, V> mapping : mappings) {
                 final String hostname = normalizeHostname(mapping.getKey());

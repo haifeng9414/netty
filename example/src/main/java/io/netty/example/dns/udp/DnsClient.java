@@ -25,8 +25,9 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelPipeline;
 import io.netty.channel.EventLoopGroup;
+import io.netty.channel.MultithreadEventLoopGroup;
 import io.netty.channel.SimpleChannelInboundHandler;
-import io.netty.channel.nio.NioEventLoopGroup;
+import io.netty.channel.nio.NioHandler;
 import io.netty.channel.socket.DatagramChannel;
 import io.netty.channel.socket.nio.NioDatagramChannel;
 import io.netty.handler.codec.dns.DatagramDnsQuery;
@@ -67,20 +68,20 @@ public final class DnsClient {
 
     public static void main(String[] args) throws Exception {
         InetSocketAddress addr = new InetSocketAddress(DNS_SERVER_HOST, DNS_SERVER_PORT);
-        EventLoopGroup group = new NioEventLoopGroup();
+        EventLoopGroup group = new MultithreadEventLoopGroup(NioHandler.newFactory());
         try {
             Bootstrap b = new Bootstrap();
             b.group(group)
              .channel(NioDatagramChannel.class)
              .handler(new ChannelInitializer<DatagramChannel>() {
                  @Override
-                 protected void initChannel(DatagramChannel ch) throws Exception {
+                 protected void initChannel(DatagramChannel ch) {
                      ChannelPipeline p = ch.pipeline();
                      p.addLast(new DatagramDnsQueryEncoder())
                      .addLast(new DatagramDnsResponseDecoder())
                      .addLast(new SimpleChannelInboundHandler<DatagramDnsResponse>() {
                         @Override
-                        protected void channelRead0(ChannelHandlerContext ctx, DatagramDnsResponse msg) {
+                        protected void messageReceived(ChannelHandlerContext ctx, DatagramDnsResponse msg) {
                             try {
                                 handleQueryResp(msg);
                             } finally {

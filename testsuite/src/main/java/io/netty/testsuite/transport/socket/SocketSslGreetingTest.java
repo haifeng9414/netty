@@ -81,10 +81,10 @@ public class SocketSslGreetingTest extends AbstractSocketTest {
 
     @Parameters(name = "{index}: serverEngine = {0}, clientEngine = {1}, delegate = {2}")
     public static Collection<Object[]> data() throws Exception {
-        List<SslContext> serverContexts = new ArrayList<SslContext>();
+        List<SslContext> serverContexts = new ArrayList<>();
         serverContexts.add(SslContextBuilder.forServer(CERT_FILE, KEY_FILE).sslProvider(SslProvider.JDK).build());
 
-        List<SslContext> clientContexts = new ArrayList<SslContext>();
+        List<SslContext> clientContexts = new ArrayList<>();
         clientContexts.add(SslContextBuilder.forClient().sslProvider(SslProvider.JDK).trustManager(CERT_FILE).build());
 
         boolean hasOpenSsl = OpenSsl.isAvailable();
@@ -97,7 +97,7 @@ public class SocketSslGreetingTest extends AbstractSocketTest {
             logger.warn("OpenSSL is unavailable and thus will not be tested.", OpenSsl.unavailabilityCause());
         }
 
-        List<Object[]> params = new ArrayList<Object[]>();
+        List<Object[]> params = new ArrayList<>();
         for (SslContext sc: serverContexts) {
             for (SslContext cc: clientContexts) {
                 params.add(new Object[] { sc, cc, true });
@@ -187,11 +187,11 @@ public class SocketSslGreetingTest extends AbstractSocketTest {
 
     private static class ClientHandler extends SimpleChannelInboundHandler<ByteBuf> {
 
-        final AtomicReference<Throwable> exception = new AtomicReference<Throwable>();
+        final AtomicReference<Throwable> exception = new AtomicReference<>();
         final CountDownLatch latch = new CountDownLatch(1);
 
         @Override
-        public void channelRead0(ChannelHandlerContext ctx, ByteBuf buf) throws Exception {
+        public void messageReceived(ChannelHandlerContext ctx, ByteBuf buf) throws Exception {
             assertEquals('a', buf.readByte());
             assertFalse(buf.isReadable());
             latch.countDown();
@@ -212,10 +212,10 @@ public class SocketSslGreetingTest extends AbstractSocketTest {
 
     private static class ServerHandler extends SimpleChannelInboundHandler<String> {
         volatile Channel channel;
-        final AtomicReference<Throwable> exception = new AtomicReference<Throwable>();
+        final AtomicReference<Throwable> exception = new AtomicReference<>();
 
         @Override
-        protected void channelRead0(ChannelHandlerContext ctx, String msg) throws Exception {
+        protected void messageReceived(ChannelHandlerContext ctx, String msg) throws Exception {
             // discard
         }
 

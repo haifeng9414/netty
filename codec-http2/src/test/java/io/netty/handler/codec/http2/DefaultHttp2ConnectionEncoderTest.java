@@ -37,7 +37,6 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
-import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
 
 import java.util.ArrayList;
@@ -127,96 +126,66 @@ public class DefaultHttp2ConnectionEncoderTest {
         when(channel.unsafe()).thenReturn(unsafe);
         ChannelConfig config = new DefaultChannelConfig(channel);
         when(channel.config()).thenReturn(config);
-        doAnswer(new Answer<ChannelFuture>() {
-            @Override
-            public ChannelFuture answer(InvocationOnMock in) {
-                return newPromise().setFailure((Throwable) in.getArgument(0));
-            }
-        }).when(channel).newFailedFuture(any(Throwable.class));
+        doAnswer(in -> newPromise()
+                .setFailure((Throwable) in.getArgument(0))).when(channel).newFailedFuture(any(Throwable.class));
 
         when(writer.configuration()).thenReturn(writerConfig);
         when(writerConfig.frameSizePolicy()).thenReturn(frameSizePolicy);
         when(frameSizePolicy.maxFrameSize()).thenReturn(64);
-        doAnswer(new Answer<ChannelFuture>() {
-            @Override
-            public ChannelFuture answer(InvocationOnMock in) throws Throwable {
-                return ((ChannelPromise) in.getArguments()[2]).setSuccess();
-            }
-        }).when(writer).writeSettings(eq(ctx), any(Http2Settings.class), any(ChannelPromise.class));
-        doAnswer(new Answer<ChannelFuture>() {
-            @Override
-            public ChannelFuture answer(InvocationOnMock in) throws Throwable {
-                ((ByteBuf) in.getArguments()[3]).release();
-                return ((ChannelPromise) in.getArguments()[4]).setSuccess();
-            }
+        doAnswer((Answer<ChannelFuture>) in -> ((ChannelPromise) in.getArguments()[2])
+                .setSuccess()).when(writer).writeSettings(eq(ctx), any(Http2Settings.class), any(ChannelPromise.class));
+        doAnswer((Answer<ChannelFuture>) in -> {
+            ((ByteBuf) in.getArguments()[3]).release();
+            return ((ChannelPromise) in.getArguments()[4]).setSuccess();
         }).when(writer).writeGoAway(eq(ctx), anyInt(), anyInt(), any(ByteBuf.class), any(ChannelPromise.class));
-        writtenData = new ArrayList<String>();
-        writtenPadding = new ArrayList<Integer>();
+        writtenData = new ArrayList<>();
+        writtenPadding = new ArrayList<>();
         when(writer.writeData(eq(ctx), anyInt(), any(ByteBuf.class), anyInt(), anyBoolean(),
-                any(ChannelPromise.class))).then(new Answer<ChannelFuture>() {
-                    @Override
-                    public ChannelFuture answer(InvocationOnMock in) throws Throwable {
-                        // Make sure we only receive stream closure on the last frame and that void promises
-                        // are used for all writes except the last one.
-                        ChannelPromise promise = (ChannelPromise) in.getArguments()[5];
-                        if (streamClosed) {
-                            fail("Stream already closed");
-                        } else {
-                            streamClosed = (Boolean) in.getArguments()[4];
-                        }
-                        writtenPadding.add((Integer) in.getArguments()[3]);
-                        ByteBuf data = (ByteBuf) in.getArguments()[2];
-                        writtenData.add(data.toString(UTF_8));
-                        // Release the buffer just as DefaultHttp2FrameWriter does
-                        data.release();
-                        // Let the promise succeed to trigger listeners.
-                        return promise.setSuccess();
+                any(ChannelPromise.class))).then((Answer<ChannelFuture>) in -> {
+                    // Make sure we only receive stream closure on the last frame and that void promises
+                    // are used for all writes except the last one.
+                    ChannelPromise promise = (ChannelPromise) in.getArguments()[5];
+                    if (streamClosed) {
+                        fail("Stream already closed");
+                    } else {
+                        streamClosed = (Boolean) in.getArguments()[4];
                     }
+                    writtenPadding.add((Integer) in.getArguments()[3]);
+                    ByteBuf data = (ByteBuf) in.getArguments()[2];
+                    writtenData.add(data.toString(UTF_8));
+                    // Release the buffer just as DefaultHttp2FrameWriter does
+                    data.release();
+                    // Let the promise succeed to trigger listeners.
+                    return promise.setSuccess();
                 });
         when(writer.writeHeaders(eq(ctx), anyInt(), any(Http2Headers.class), anyInt(), anyShort(), anyBoolean(),
                 anyInt(), anyBoolean(), any(ChannelPromise.class)))
-                .then(new Answer<ChannelFuture>() {
-                    @Override
-                    public ChannelFuture answer(InvocationOnMock invocationOnMock) {
-                        ChannelPromise promise = invocationOnMock.getArgument(8);
-                        if (streamClosed) {
-                            fail("Stream already closed");
-                        } else {
-                            streamClosed = invocationOnMock.getArgument(5);
-                        }
-                        return promise.setSuccess();
+                .then((Answer<ChannelFuture>) invocationOnMock -> {
+                    ChannelPromise promise = invocationOnMock.getArgument(8);
+                    if (streamClosed) {
+                        fail("Stream already closed");
+                    } else {
+                        streamClosed = (Boolean) invocationOnMock.getArguments()[5];
                     }
+                    return promise.setSuccess();
                 });
         when(writer.writeHeaders(eq(ctx), anyInt(), any(Http2Headers.class),
                 anyInt(), anyBoolean(), any(ChannelPromise.class)))
-                .then(new Answer<ChannelFuture>() {
-                    @Override
-                    public ChannelFuture answer(InvocationOnMock invocationOnMock) {
-                        ChannelPromise promise = invocationOnMock.getArgument(5);
-                        if (streamClosed) {
-                            fail("Stream already closed");
-                        } else {
-                            streamClosed = invocationOnMock.getArgument(4);
-                        }
-                        return promise.setSuccess();
+                .then((Answer<ChannelFuture>) invocationOnMock -> {
+                    ChannelPromise promise = invocationOnMock.getArgument(5);
+                    if (streamClosed) {
+                        fail("Stream already closed");
+                    } else {
+                        streamClosed = invocationOnMock.getArgument(4);
                     }
+                    return promise.setSuccess();
                 });
         payloadCaptor = ArgumentCaptor.forClass(Http2RemoteFlowController.FlowControlled.class);
         doNothing().when(remoteFlow).addFlowControlled(any(Http2Stream.class), payloadCaptor.capture());
         when(ctx.alloc()).thenReturn(UnpooledByteBufAllocator.DEFAULT);
         when(ctx.channel()).thenReturn(channel);
-        doAnswer(new Answer<ChannelPromise>() {
-            @Override
-            public ChannelPromise answer(InvocationOnMock in) throws Throwable {
-                return newPromise();
-            }
-        }).when(ctx).newPromise();
-        doAnswer(new Answer<ChannelFuture>() {
-            @Override
-            public ChannelFuture answer(InvocationOnMock in) throws Throwable {
-                return newSucceededFuture();
-            }
-        }).when(ctx).newSucceededFuture();
+        doAnswer((Answer<ChannelPromise>) in -> newPromise()).when(ctx).newPromise();
+        doAnswer((Answer<ChannelFuture>) in -> newSucceededFuture()).when(ctx).newSucceededFuture();
         when(ctx.flush()).thenThrow(new AssertionFailedError("forbidden"));
         when(channel.alloc()).thenReturn(PooledByteBufAllocator.DEFAULT);
 
@@ -351,13 +320,10 @@ public class DefaultHttp2ConnectionEncoderTest {
         final Throwable cause = new RuntimeException("fake exception");
         when(writer.writeHeaders(eq(ctx), eq(STREAM_ID), any(Http2Headers.class),
                                  anyInt(), anyBoolean(), any(ChannelPromise.class)))
-                .then(new Answer<ChannelFuture>() {
-                    @Override
-                    public ChannelFuture answer(InvocationOnMock invocationOnMock) throws Throwable {
-                        ChannelPromise promise = invocationOnMock.getArgument(5);
-                        assertFalse(promise.isVoid());
-                        return promise.setFailure(cause);
-                    }
+                .then((Answer<ChannelFuture>) invocationOnMock -> {
+                    ChannelPromise promise = invocationOnMock.getArgument(5);
+                    assertFalse(promise.isVoid());
+                    return promise.setFailure(cause);
                 });
         createStream(STREAM_ID, false);
         // END_STREAM flag, so that a listener is added to the future.
@@ -767,12 +733,9 @@ public class DefaultHttp2ConnectionEncoderTest {
         final Throwable ex = new RuntimeException();
         // Fake an encoding error, like HPACK's HeaderListSizeException
         when(writer.writeHeaders(eq(ctx), eq(STREAM_ID), eq(EmptyHttp2Headers.INSTANCE), eq(0), eq(true), eq(promise)))
-            .thenAnswer(new Answer<ChannelFuture>() {
-                @Override
-                public ChannelFuture answer(InvocationOnMock invocation) {
-                    promise.setFailure(ex);
-                    return promise;
-                }
+            .thenAnswer((Answer<ChannelFuture>) invocation -> {
+                promise.setFailure(ex);
+                return promise;
             });
 
         writeAllFlowControlledFrames();
@@ -793,12 +756,9 @@ public class DefaultHttp2ConnectionEncoderTest {
         final Throwable ex = new RuntimeException();
         // Fake an encoding error, like HPACK's HeaderListSizeException
         when(writer.writeHeaders(eq(ctx), eq(STREAM_ID), eq(EmptyHttp2Headers.INSTANCE), eq(0), eq(true), eq(promise)))
-            .thenAnswer(new Answer<ChannelFuture>() {
-                @Override
-                public ChannelFuture answer(InvocationOnMock invocation) {
-                    promise.setFailure(ex);
-                    return promise;
-                }
+            .thenAnswer((Answer<ChannelFuture>) invocation -> {
+                promise.setFailure(ex);
+                return promise;
             });
 
         writeAllFlowControlledFrames();
@@ -906,14 +866,11 @@ public class DefaultHttp2ConnectionEncoderTest {
     }
 
     private void writeAllFlowControlledFrames() {
-        doAnswer(new Answer<Void>() {
-            @Override
-            public Void answer(InvocationOnMock invocationOnMock) throws Throwable {
-                FlowControlled flowControlled = (FlowControlled) invocationOnMock.getArguments()[1];
-                flowControlled.write(ctx, Integer.MAX_VALUE);
-                flowControlled.writeComplete();
-                return null;
-            }
+        doAnswer((Answer<Void>) invocationOnMock -> {
+            FlowControlled flowControlled = (FlowControlled) invocationOnMock.getArguments()[1];
+            flowControlled.write(ctx, Integer.MAX_VALUE);
+            flowControlled.writeComplete();
+            return null;
         }).when(remoteFlow).addFlowControlled(any(Http2Stream.class), payloadCaptor.capture());
     }
 

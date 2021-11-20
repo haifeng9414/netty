@@ -87,7 +87,7 @@ public abstract class SslContextTest {
         newSslContext(crtFile, keyFile, null);
     }
 
-    @Test(expected = SSLException.class)
+    @Test(expected = IllegalArgumentException.class)
     public void testSslContextWithUnencryptedPrivateKeyEmptyPass() throws SSLException {
         File keyFile = ResourcesUtil.getFile(getClass(), "test_unencrypted.pem");
         File crtFile = ResourcesUtil.getFile(getClass(), "test.crt");

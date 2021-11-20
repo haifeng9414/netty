@@ -16,7 +16,6 @@
 package io.netty.handler.codec.http2;
 
 import io.netty.util.internal.PlatformDependent;
-import io.netty.util.internal.SuppressJava6Requirement;
 import io.netty.util.internal.UnstableApi;
 
 import java.util.ArrayList;
@@ -24,7 +23,7 @@ import java.util.Iterator;
 import java.util.List;
 
 import static io.netty.handler.codec.http2.Http2CodecUtil.CONNECTION_STREAM_ID;
-import static io.netty.util.internal.ObjectUtil.checkNotNull;
+import static java.util.Objects.requireNonNull;
 
 /**
  * Exception thrown when an HTTP/2 error was encountered.
@@ -40,8 +39,8 @@ public class Http2Exception extends Exception {
     }
 
     public Http2Exception(Http2Error error, ShutdownHint shutdownHint) {
-        this.error = checkNotNull(error, "error");
-        this.shutdownHint = checkNotNull(shutdownHint, "shutdownHint");
+        this.error = requireNonNull(error, "error");
+        this.shutdownHint = requireNonNull(shutdownHint, "shutdownHint");
     }
 
     public Http2Exception(Http2Error error, String message) {
@@ -50,8 +49,8 @@ public class Http2Exception extends Exception {
 
     public Http2Exception(Http2Error error, String message, ShutdownHint shutdownHint) {
         super(message);
-        this.error = checkNotNull(error, "error");
-        this.shutdownHint = checkNotNull(shutdownHint, "shutdownHint");
+        this.error = requireNonNull(error, "error");
+        this.shutdownHint = requireNonNull(shutdownHint, "shutdownHint");
     }
 
     public Http2Exception(Http2Error error, String message, Throwable cause) {
@@ -60,8 +59,8 @@ public class Http2Exception extends Exception {
 
     public Http2Exception(Http2Error error, String message, Throwable cause, ShutdownHint shutdownHint) {
         super(message, cause);
-        this.error = checkNotNull(error, "error");
-        this.shutdownHint = checkNotNull(shutdownHint, "shutdownHint");
+        this.error = requireNonNull(error, "error");
+        this.shutdownHint = requireNonNull(shutdownHint, "shutdownHint");
     }
 
     static Http2Exception newStatic(Http2Error error, String message, ShutdownHint shutdownHint) {
@@ -71,13 +70,11 @@ public class Http2Exception extends Exception {
         return new Http2Exception(error, message, shutdownHint);
     }
 
-    @SuppressJava6Requirement(reason = "uses Java 7+ Exception.<init>(String, Throwable, boolean, boolean)" +
-            " but is guarded by version checks")
     private Http2Exception(Http2Error error, String message, ShutdownHint shutdownHint, boolean shared) {
         super(message, null, false, true);
         assert shared;
-        this.error = checkNotNull(error, "error");
-        this.shutdownHint = checkNotNull(shutdownHint, "shutdownHint");
+        this.error = requireNonNull(error, "error");
+        this.shutdownHint = requireNonNull(shutdownHint, "shutdownHint");
     }
 
     public Http2Error error() {
@@ -293,7 +290,7 @@ public class Http2Exception extends Exception {
 
         public CompositeStreamException(Http2Error error, int initialCapacity) {
             super(error, ShutdownHint.NO_SHUTDOWN);
-            exceptions = new ArrayList<StreamException>(initialCapacity);
+            exceptions = new ArrayList<>(initialCapacity);
         }
 
         public void add(StreamException e) {

@@ -15,7 +15,7 @@
  */
 package io.netty.handler.codec.socks;
 
-import io.netty.util.internal.ObjectUtil;
+import static java.util.Objects.requireNonNull;
 
 /**
  * An abstract class that defines a SocksRequest, providing common properties for
@@ -31,7 +31,8 @@ public abstract class SocksRequest extends SocksMessage {
 
     protected SocksRequest(SocksRequestType requestType) {
         super(SocksMessageType.REQUEST);
-        this.requestType = ObjectUtil.checkNotNull(requestType, "requestType");
+        requireNonNull(requestType, "requestType");
+        this.requestType = requestType;
     }
 
     /**
