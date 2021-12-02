@@ -1,82 +1,52 @@
-/*
- * Copyright 2012 The Netty Project
- *
- * The Netty Project licenses this file to you under the Apache License,
- * version 2.0 (the "License"); you may not use this file except in compliance
- * with the License. You may obtain a copy of the License at:
- *
- *   http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations
- * under the License.
- */
-package io.netty.util;
+= 概念
 
-import io.netty.util.internal.PlatformDependent;
-import io.netty.util.internal.logging.InternalLogger;
-import io.netty.util.internal.logging.InternalLoggerFactory;
+如果一个系统中存在着大量的调度任务，而大量的调度任务如果每一个都使用自己的调度器来管理任务的生命周期的话，浪费cpu的资源并且很低效。
 
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.Queue;
-import java.util.Set;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.Executors;
-import java.util.concurrent.RejectedExecutionException;
-import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicIntegerFieldUpdater;
-import java.util.concurrent.atomic.AtomicLong;
+时间轮是一种高效来利用线程资源来进行批量化调度的一种调度模型。把大批量的调度任务全部都绑定到同一个的调度器上面，使用这一个调度器来进行所有任务的管理（manager），触发（trigger）以及运行（runnable）。能够高效的管理各种延时任务，周期任务，通知任务等等。
 
-import static io.netty.util.internal.StringUtil.simpleClassName;
-import static java.util.Objects.requireNonNull;
+不过，时间轮调度器的时间精度可能不是很高，对于精度要求特别高的调度任务可能不太适合。因为时间轮算法的精度取决于，时间段“指针”单元的最小粒度大小，比如时间轮的格子是一秒跳一次，那么调度精度小于一秒的任务就无法被时间轮所调度。
 
-/**
- * A {@link Timer} optimized for approximated I/O timeout scheduling.
- *
- * <h3>Tick Duration</h3>
- *
- * As described with 'approximated', this timer does not execute the scheduled
- * {@link TimerTask} on time.  {@link HashedWheelTimer}, on every tick, will
- * check if there are any {@link TimerTask}s behind the schedule and execute
- * them.
- * <p>
- * You can increase or decrease the accuracy of the execution timing by
- * specifying smaller or larger tick duration in the constructor.  In most
- * network applications, I/O timeout does not need to be accurate.  Therefore,
- * the default tick duration is 100 milliseconds and you will not need to try
- * different configurations in most cases.
- *
- * <h3>Ticks per Wheel (Wheel Size)</h3>
- *
- * {@link HashedWheelTimer} maintains a data structure called 'wheel'.
- * To put simply, a wheel is a hash table of {@link TimerTask}s whose hash
- * function is 'dead line of the task'.  The default number of ticks per wheel
- * (i.e. the size of the wheel) is 512.  You could specify a larger value
- * if you are going to schedule a lot of timeouts.
- *
- * <h3>Do not create many instances.</h3>
- *
- * {@link HashedWheelTimer} creates a new thread whenever it is instantiated and
- * started.  Therefore, you should make sure to create only one instance and
- * share it across your application.  One of the common mistakes, that makes
- * your application unresponsive, is to create a new instance for every connection.
- *
- * <h3>Implementation Details</h3>
- *
- * {@link HashedWheelTimer} is based on
- * <a href="http://cseweb.ucsd.edu/users/varghese/">George Varghese</a> and
- * Tony Lauck's paper,
- * <a href="http://cseweb.ucsd.edu/users/varghese/PAPERS/twheel.ps.Z">'Hashed
- * and Hierarchical Timing Wheels: data structures to efficiently implement a
- * timer facility'</a>.  More comprehensive slides are located
- * <a href="http://www.cse.wustl.edu/~cdgill/courses/cs6874/TimingWheels.ppt">here</a>.
- */
+时间轮就是和手表时钟很相似的存在。时间轮用环形数组实现，数组的每个元素可以称为槽，和HashMap一样。槽的内部用双向链表存着待执行的任务，添加和删除的链表操作时间复杂度都是 O(1)，槽位本身也指代时间精度，比如一秒扫一个槽，那么这个时间轮的最高精度就是1秒。
+
+JDK提供了DelayQueue和ScheduledThreadPool等支持调度的工具类，和时间轮有什么区别呢？最大的区别是DelayQueue和ScheduledThreadPool都基于优先队列（堆）实现，所以插入删除时间复杂度是O(logn)，如果频繁插入删除，这种时间复杂度满足不了Kafka这类中间件对性能的要求，而时间轮算法的插入删除时间复杂度是O(1)。
+
+== 实现
+
+netty中时间轮的实现类是HashedWheelTimer，其实现原理是，定义了一个大小固定的数组（默认大小512，构造函数可修改），数组的元素是一个双向链表，每个数组元素的双向链表保存了相同等待时间的任务（remainingRounds大于0的表示要等待remainingRounds圈）。创建HashedWheelTimer对象时还需要指定tickDuration属性，表示时间轮的精度，如果tickDuration为1秒，则HashedWheelTimer对象支持的调度最小时间就是1秒。
+
+每次调用HashedWheelTimer的newTimeout方法都会创建一个HashedWheelTimeout对象并保存到一个队列中，HashedWheelTimer构造函数在创建数组以后会创建一个worker进程，worker进程在无限循环中遍历数组，每隔tickDuration的时间遍历一个数组元素（通过Thread.sleep(sleepTimeMs)实现等待），在遍历数组元素之前会从队列中获取所有（默认只获取100000个，为了防止无限循环了）HashedWheelTimeout对象并根据其deadline时间将HashedWheelTimeout对象添加到其应该存在的数组元素中，遍历到某个数组元素后，会遍历数组元素的双向链表，逐个同步执行任务（如果remainingRounds大于0则只是remainingRounds - 1）。
+
+HashedWheelTimer的实现本质上就是一个数组，数组元素是双向链表（方便增减元素），需要延迟执行的任务会被保存到某个双向链表中（根据延迟时间决定数组位置），worker线程循环遍历数组元素，同步执行到了执行时间的任务。
+
+下面是HashedWheelTimer类的源码分析：
+
+[java]
+----
+// HashedWheelTimer实现的接口
+public interface Timer {
+
+    /**
+     * Schedules the specified {@link TimerTask} for one-time execution after
+     * the specified delay.
+     *
+     * @return a handle which is associated with the specified task
+     *
+     * @throws IllegalStateException       if this timer has been {@linkplain #stop() stopped} already
+     * @throws RejectedExecutionException if the pending timeouts are too many and creating new timeout
+     *                                    can cause instability in the system.
+     */
+    Timeout newTimeout(TimerTask task, long delay, TimeUnit unit);
+
+    /**
+     * Releases all resources acquired by this {@link Timer} and cancels all
+     * tasks which were scheduled but not executed yet.
+     *
+     * @return the handles associated with the tasks which were canceled by
+     *         this method
+     */
+    Set<Timeout> stop();
+}
+
 public class HashedWheelTimer implements Timer {
 
     static final InternalLogger logger =
@@ -933,3 +903,4 @@ public class HashedWheelTimer implements Timer {
         }
     }
 }
+----
