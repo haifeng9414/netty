@@ -3,7 +3,7 @@
 == 基础
 === 核心接口
 ==== Channel接口
-基本的I/O操作（bind()、connect()、read()和write()）依赖于底层网络传输所提供的原语。在基于Java的网络编程中，其基本的构造是classSocket。Netty的Channel接口所提供的API，大大地降低了直接使用Socket类的复杂性。
+基本的I/O操作（bind()、connect()、read()和write()）依赖于底层网络传输所提供的原语。在基于Java的网络编程中，其基本的构造是classSocket。Netty的Channel接口是网络操作的抽象类，大大地降低了直接使用Socket类的复杂性。
 
 Channel有以下生命周期状态：
 
@@ -15,7 +15,10 @@ Channel有以下生命周期状态：
 当这些状态发生改变时，将会生成对应的事件。这些事件将会被转发给ChannelPipeline中的ChannelHandler，状态的转变模型为：ChannelRegistered -> ChannelActive -> ChannelInactive -> ChannelUnregistered
 
 ==== EventLoop和EventLoopGroup接口
-EventLoop定义了Netty的核心抽象，用于处理连接的生命周期中所发生的事件。
+EventLoopGroup包含多个EventLoop，EventLoop定义了Netty的核心抽象，用于处理连接的生命周期中所发生的事件，主要作用是负责监听网络事件并调用事件处理器进行相关I/O操作的处理。
+并且EventLoop处理的I/O事件都将在它专有的Thread上被处理，即Thread和EventLoop属于1 : 1的关系，从而保证线程安全。
+Boss EventloopGroup用于接收连接，Worker EventloopGroup用于具体的处理(消息的读写以及其他逻辑处理)。
+当客户端通过connect方法连接服务端时，bossGroup处理客户端连接请求。当客户端处理完成后，会将这个连接提交给workerGroup来处理，然后workerGroup负责处理其IO相关操作。
 
 - 一个EventLoopGroup包含一个或者多个EventLoop；
 - 一个EventLoop在它的生命周期内只和一个Thread绑定；
@@ -63,6 +66,17 @@ ChannelHandlerContext有很多的方法，其中一些方法也存在于Channel�
 === 引导
 Netty的引导类为应用程序的网络层配置提供了容器，这涉及将一个进程绑定到某个指定的端口，或者将一个进程连接到另一个运行在某个指定主机的指定端口上的进程。通常来说，前面的用例称作引导一个服务器，后面的用例称作引导一个客户端。因此，有两种类型的引导：一种用于客户端（简单地称为Bootstrap），而另一种（ServerBootstrap）用于服务器。无论你的应用程序使用哪种协议或者处理哪种类型的数据，唯一决定它使用哪种引导类的是它是作为一个客户端还是作为一个服务器。
 通常引导一个客户端只需要一个EventLoopGroup，但是一个ServerBootstrap则需要两个（也可以是同一个EventLoopGroup）。因为服务器需要两组不同的Channel，第一组将只包含一个ServerChannel，代表服务器自身的已绑定到某个本地端口的正在监听的套接字。而第二组将包含所有已创建的用来处理传入客户端连接（对于每个服务器已经接受的连接都有一个）的Channel。与ServerChannel相关联的EventLoopGroup中的EventLoop负责为传入连接请求创建Channel。一旦连接被接受，第二个EventLoopGroup就会给新建的Channel分配一个EventLoop。
+
+### Netty线程模型
+在Netty主要靠NioEventLoopGroup线程池来实现具体的线程模型的。实现服务端的时候，一般会初始化两个线程组:
+- bossGroup：接收连接。
+- workerGroup：负责具体的处理，交由对应的Handler处理。
+
+单线程模型：一个线程需要执行处理所有的accept、read、decode、process、encode、send事件。 对于高负载、高并发，并且对性能要求比较高的场景不适用。
+
+多线程模型：一个Acceptor线程只负责监听客户端的连接，一个NIO线程池负责具体处理accept、read、decode、process、encode、send事件。满足绝大部分应用场景，并发连接量不大的时候没啥问题，但是遇到并发连接大的时候就可能会出现问题，成为性能瓶颈。
+
+主从多线程模型：从一个主线程NIO线程池中选择一个线程作为Acceptor线程，绑定监听端口，接收客户端连接的连接，其他线程负责后续的接入认证等工作。连接建立完成后，Sub NIO线程池负责具体处理I/O读写。如果多线程模型无法满足需求的时候，可以考虑使用主从多线程模型 。
 
 === ByteBuf
 JavaNIO提供了ByteBuffer作为字节容器，但是这个类使用起来过于复杂，而且也有些繁琐。Netty的ByteBuffer替代品是ByteBuf，为网络应用程序的开发者提供了更好的API。
